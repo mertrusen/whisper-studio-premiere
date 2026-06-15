@@ -3,7 +3,7 @@
   Version="11.0"
   ExtensionBundleId="com.whisper.studio"
   ExtensionBundleVersion="1.0.0"
-  ExtensionBundleName="Whisper Studio"
+  ExtensionBundleName="Subsper"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <ExtensionList>
@@ -38,7 +38,7 @@
         </Lifecycle>
         <UI>
           <Type>Panel</Type>
-          <Menu>Whisper Studio</Menu>
+          <Menu>Subsper</Menu>
           <Geometry>
             <Size>
               <Width>420</Width>

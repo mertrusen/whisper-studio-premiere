@@ -1,4 +1,4 @@
-# Whisper Studio — Premiere Pro Extension
+# Subsper — Premiere Pro Extension
 
 Local AI subtitles, audio cleanup, silence cutting & auto-zoom for **Adobe Premiere
 Pro**. 100% offline & free (no paid APIs). EN / TR interface.
@@ -21,7 +21,7 @@ A standalone desktop version (for CapCut / non-Premiere users) lives at
 2. Enable unsigned extensions (one time):
    - **macOS:** `defaults write com.adobe.CSXS.11 PlayerDebugMode 1` (also try CSXS.10/12)
    - **Windows:** registry `HKEY_CURRENT_USER\Software\Adobe\CSXS.11` → `PlayerDebugMode` = `1` (string)
-3. Restart Premiere → **Window → Extensions → Whisper Studio**.
+3. Restart Premiere → **Window → Extensions → Subsper**.
 
 ## Requirements (installed once, guided by the Setup tab)
 ```
