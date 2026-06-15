@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Whisper Studio</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <span class="brand-mark">W</span>
+      <div class="brand-text">
+        <span class="brand-title">Whisper <span>Studio</span></span>
+        <span class="brand-tagline" data-i18n="tagline">AI Subtitles</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <select id="header-lang" class="lang-select" onchange="setLanguage(this.value)" data-i18n-tip="tip_uilang">
+        <option value="en">EN</option>
+        <option value="tr">TR</option>
+      </select>
+      <span class="setup-indicator" id="setup-indicator" data-i18n-tip="tip_tab_setup"></span>
+    </div>
+  </div>
+
+  <!-- ── Main tabs (top level) ───────────────────────────────────────── -->
+  <div class="tabs">
+    <button class="tab active" id="tab-transcribe" onclick="switchMainTab('transcribe')" data-i18n-tip="tip_tab_transcribe">
+      <span class="tab-ico">🎬</span><span data-i18n="tab_transcribe">Subtitles</span>
+    </button>
+    <button class="tab" id="tab-edit" onclick="switchMainTab('edit')" data-i18n-tip="tip_tab_edit">
+      <span class="tab-ico">✂️</span><span data-i18n="tab_edit">Edit</span>
+    </button>
+    <button class="tab" id="tab-audio" onclick="switchMainTab('audio')" data-i18n-tip="tip_tab_audio">
+      <span class="tab-ico">🔊</span><span data-i18n="tab_audio">Audio</span>
+    </button>
+    <button class="tab" id="tab-setup" onclick="switchMainTab('setup')" data-i18n-tip="tip_tab_setup">
+      <span class="tab-ico">⚙️</span><span data-i18n="tab_setup">Setup</span>
+      <span class="tab-badge" id="setup-badge" style="display:none">!</span>
+    </button>
+  </div>
+
+  <!-- ── Sub-tabs: Subtitles ────────────────────────────────────────── -->
+  <div class="sub-tabs" id="sub-tabs-transcribe">
+    <button class="sub-tab active" id="sub-tab-tx-work" onclick="switchSubTab('transcribe','work')" data-i18n-tip="tip_sub_tx_work">
+      <span data-i18n="sub_work_tx">Edit</span>
+    </button>
+    <button class="sub-tab" id="sub-tab-tx-settings" onclick="switchSubTab('transcribe','settings')" data-i18n-tip="tip_sub_tx_settings">
+      ⚙ <span data-i18n="sub_settings">Settings</span>
+    </button>
+  </div>
+
+  <!-- ── Sub-tabs: Edit ─────────────────────────────────────────────── -->
+  <div class="sub-tabs" id="sub-tabs-edit" style="display:none">
+    <button class="sub-tab active" id="sub-tab-ed-work" onclick="switchSubTab('edit','work')" data-i18n-tip="tip_sub_ed_work">
+      <span data-i18n="sub_actions">Tools</span>
+    </button>
+    <button class="sub-tab" id="sub-tab-ed-settings" onclick="switchSubTab('edit','settings')" data-i18n-tip="tip_sub_sl_settings">
+      ⚙ <span data-i18n="sub_settings">Settings</span>
+    </button>
+  </div>
+
+  <!-- ── Sub-tabs: Audio ────────────────────────────────────────────── -->
+  <div class="sub-tabs" id="sub-tabs-audio" style="display:none">
+    <button class="sub-tab active" id="sub-tab-au-work" onclick="switchSubTab('audio','work')" data-i18n-tip="tip_sub_au_work">
+      <span data-i18n="sub_actions">Tools</span>
+    </button>
+    <button class="sub-tab" id="sub-tab-au-settings" onclick="switchSubTab('audio','settings')" data-i18n-tip="tip_sub_au_work">
+      ⚙ <span data-i18n="sub_settings">Settings</span>
+    </button>
+  </div>
+
+
+  <!-- ═══ PANEL: TRANSCRIBE — WORK ═══ -->
+  <div id="panel-tx-work" class="panel">
+
+    <div class="status-bar info" id="status-bar" data-i18n="status_ready">Ready</div>
+    <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+
+    <div class="controls">
+      <button class="btn-transcribe" id="transcribe-btn" onclick="startTranscription()" data-i18n-tip="tip_transcribe">
+        <span class="ico">🎙️</span><span data-i18n="btn_transcribe">Transcribe In/Out Selection</span>
+      </button>
+      <div class="transport-row">
+        <button class="btn-load-srt" onclick="importSRTFile()" style="margin-top:0" data-i18n-tip="tip_loadsrt">
+          📂 <span data-i18n="btn_loadsrt">Load SRT</span>
+        </button>
+        <button class="btn-playpause" id="playpause-btn" onclick="playPause()" data-i18n-tip="tip_play">
+          ▶&nbsp; <span data-i18n="btn_play">Play</span>
+        </button>
+      </div>
+      <input type="file" id="srt-file-input" accept=".srt" style="display:none">
+    </div>
+
+    <!-- SRT saved confirmation -->
+    <div class="srt-saved-panel" id="srt-saved-panel" style="display:none">
+      <div class="srt-saved-header">
+        <span>✅ SRT Saved</span>
+        <button class="error-close" onclick="hideSRTSaved()">✕</button>
+      </div>
+      <div class="srt-saved-body">
+        <p>Now import it into Premiere:</p>
+        <ol>
+          <li>File → Import → select the SRT below</li>
+          <li>Drag it to a <strong>Captions</strong> track on the timeline</li>
+        </ol>
+        <div class="srt-saved-path-row">
+          <code id="srt-saved-path"></code>
+          <button id="srt-saved-reveal" class="btn-reveal">📂 Reveal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error detail -->
+    <div class="error-panel" id="error-panel" style="display:none">
+      <div class="error-header">
+        <span>⚠️ Error</span>
+        <button class="error-close" onclick="hideError()">✕</button>
+      </div>
+      <div class="error-what" id="error-what"></div>
+      <div class="error-why" id="error-why" style="display:none">
+        <strong>Why did this happen?</strong>
+        <p id="error-why-text"></p>
+      </div>
+      <div class="error-fix" id="error-fix" style="display:none">
+        <strong>How to fix it:</strong>
+        <p id="error-fix-text"></p>
+        <button class="error-fix-btn" id="error-fix-btn" style="display:none"></button>
+      </div>
+    </div>
+
+    <!-- Find & Replace -->
+    <div class="find-panel" id="find-panel" style="display:none">
+      <div class="find-row">
+        <input type="text" id="find-input" data-i18n-ph="find_ph" placeholder="Find…" oninput="updateFindCount()"
+               onkeydown="if(event.key==='Enter'){event.shiftKey?findPrev():findNext();}">
+        <label class="find-opt" data-i18n-tip="tip_case">
+          <input type="checkbox" id="find-case" onchange="updateFindCount()"> Aa
+        </label>
+        <button class="btn-secondary find-nav" onclick="findPrev()" data-i18n-tip="tip_findprev">▲</button>
+        <button class="btn-secondary find-nav" onclick="findNext()" data-i18n-tip="tip_findnext">▼</button>
+      </div>
+      <div class="find-actions" style="margin-bottom:6px">
+        <span class="find-count" id="find-count">—</span>
+        <button class="btn-secondary" onclick="closeFindReplace()" data-i18n="btn_close">Close</button>
+      </div>
+      <div class="find-row">
+        <input type="text" id="replace-input" data-i18n-ph="replace_ph" placeholder="Replace with… (optional)"
+               data-i18n-tip="tip_replaceinput"
+               onkeydown="if(event.key==='Enter')doReplaceAll()">
+        <button class="btn-send" id="replace-btn" onclick="doReplaceAll()" data-i18n-tip="tip_replaceall" data-i18n="btn_replaceall">Replace All</button>
+      </div>
+    </div>
+
+    <!-- Segments list -->
+    <div class="segments-wrap" id="segments-wrap">
+      <div class="empty-state">
+        <div class="icon">🎬</div>
+        <p data-i18n="empty_p">Set In (I) and Out (O) points on your timeline, then click Transcribe.</p>
+        <p class="hint" data-i18n="empty_hint">Click a word to split there · double-click text to edit.</p>
+      </div>
+    </div>
+
+    <!-- Actions bar -->
+    <div class="actions-bar" id="actions-bar" style="display:none">
+      <span class="seg-count" id="seg-count" data-i18n-tip="tip_segcount"></span>
+      <button class="btn-secondary" onclick="toggleFindReplace()" data-i18n-tip="tip_find">🔍</button>
+      <button class="btn-secondary" id="punct-btn" onclick="fixPunctuation()" data-i18n-tip="tip_punct">¶</button>
+      <div class="export-wrap">
+        <button class="btn-secondary" onclick="toggleCleanMenu()" data-i18n-tip="tip_clean">🧹</button>
+        <div class="export-menu" id="clean-menu" style="display:none">
+          <div class="export-menu-title" data-i18n="clean_title">Clean up…</div>
+          <button onclick="cleanMenuAction('dict')" data-i18n-tip="tip_clean_dict"><span data-i18n="clean_dict">Apply Dictionary</span><span>A→B</span></button>
+          <button onclick="cleanMenuAction('filler')" data-i18n-tip="tip_clean_filler"><span data-i18n="clean_filler">Remove Fillers</span><span>ee, ıı…</span></button>
+          <button onclick="cleanMenuAction('prof')" data-i18n-tip="tip_clean_prof"><span data-i18n="clean_prof">Censor Profanity</span><span>***</span></button>
+          <button onclick="cleanMenuAction('all')" data-i18n-tip="tip_clean_all"><span data-i18n="clean_all">Clean All</span><span>✨</span></button>
+        </div>
+      </div>
+      <div class="export-wrap">
+        <button class="btn-secondary" onclick="toggleExportMenu()" data-i18n-tip="tip_export">⬇</button>
+        <div class="export-menu" id="export-menu" style="display:none">
+          <div class="export-menu-title" data-i18n="export_title">Export as…</div>
+          <button onclick="exportAs('srt')" data-i18n-tip="tip_export_srt"><span data-i18n="export_srt">SubRip</span><span>.srt</span></button>
+          <button onclick="exportAs('vtt')" data-i18n-tip="tip_export_vtt"><span data-i18n="export_vtt">WebVTT</span><span>.vtt</span></button>
+          <button onclick="exportAs('ass')" data-i18n-tip="tip_export_ass"><span data-i18n="export_ass">Advanced SSA</span><span>.ass</span></button>
+          <button onclick="exportAs('txt')" data-i18n-tip="tip_export_txt"><span data-i18n="export_txt">Plain text</span><span>.txt</span></button>
+        </div>
+      </div>
+      <button class="btn-secondary" onclick="clearAll()" data-i18n-tip="tip_clear" data-i18n="act_clear">Clear</button>
+      <button class="btn-send" id="send-btn" onclick="sendToPremiere()" disabled data-i18n-tip="tip_send">
+        📤 <span data-i18n="act_send">Send to Premiere</span>
+      </button>
+    </div>
+
+  </div><!-- /panel-tx-work -->
+
+
+  <!-- ═══ PANEL: TRANSCRIBE — SETTINGS ═══ -->
+  <div id="panel-tx-settings" class="panel" style="display:none">
+    <div class="setup-scroll">
+
+      <div class="setup-section-title" data-i18n="sec_interface">Interface</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="lbl_uilang">Language</div>
+            <div class="setting-desc">English · Türkçe</div>
+          </div>
+          <select id="set-uilang" style="max-width:120px" onchange="setLanguage(this.value)" data-i18n-tip="tip_uilang">
+            <option value="en">English</option>
+            <option value="tr">Türkçe</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_send">Send to Premiere</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_sendmode">Send subtitles as</div>
+            <div class="setting-desc" data-i18n="ds_sendmode">Caption track = simple. Styled graphics = editable text clips with your style (like AutoCut/FireCut).</div>
+          </div>
+        </div>
+        <div class="setting-sub" style="display:block; border-top:none; padding-top:8px">
+          <select id="set-sendmode" onchange="onSendModeChange(this.value)" data-i18n-tip="tip_sendmode">
+            <option value="caption" data-i18n="opt_caption">Caption track (SRT)</option>
+            <option value="graphics" data-i18n="opt_graphics">Styled graphics (MOGRT)</option>
+          </select>
+        </div>
+        <div class="setting-sub" id="graphics-sub" style="display:none">
+          <div class="setting-slider-header"><span data-i18n="lbl_mogrt">Style template (.mogrt)</span></div>
+          <div class="mogrt-row">
+            <span class="mogrt-name" id="mogrt-name" data-i18n="mogrt_none">No template chosen</span>
+            <button class="btn-secondary" onclick="pickMOGRT()" data-i18n-tip="tip_pickmogrt" data-i18n="btn_pickmogrt">Choose .mogrt…</button>
+          </div>
+          <div class="setting-hint" data-i18n="hint_mogrt">Export a styled text template once from Premiere: Graphics workspace → make a text layer → Export Motion Graphics Template. Then pick it here.</div>
+          <input type="file" id="mogrt-file-input" accept=".mogrt" style="display:none">
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_modellang">Model &amp; Language</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-name" data-i18n="lbl_model">Model</div></div>
+          <select id="model-select" style="max-width:210px" data-i18n-tip="tip_model">
+            <option value="turbo" selected>turbo — fast &amp; accurate ★</option>
+            <option value="large">large-v3 — best accuracy</option>
+            <option value="medium">medium</option>
+            <option value="small">small — fastest</option>
+            <option value="base">base — minimal</option>
+          </select>
+        </div>
+        <div class="setting-row" style="margin-top:10px">
+          <div class="setting-info"><div class="setting-name" data-i18n="lbl_language">Language</div></div>
+          <select id="lang-select" style="max-width:210px" data-i18n-tip="tip_lang">
+            <option value="auto" selected data-i18n="opt_auto">Auto detect</option>
+            <option value="tr">Turkish</option>
+            <option value="en">English</option>
+            <option value="de">German</option>
+            <option value="fr">French</option>
+            <option value="es">Spanish</option>
+            <option value="it">Italian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="zh">Chinese</option>
+            <option value="ar">Arabic</option>
+            <option value="ru">Russian</option>
+            <option value="pt">Portuguese</option>
+            <option value="nl">Dutch</option>
+            <option value="pl">Polish</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_engine">Transcription Engine</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_engine">Engine</div>
+            <div class="setting-desc" data-i18n="ds_engine">WhisperX gives the most accurate word timing + speaker labels</div>
+          </div>
+        </div>
+        <div class="setting-sub" style="display:block; border-top:none; padding-top:8px">
+          <select id="set-engine" onchange="onSettingChange('engine', this.value)" data-i18n-tip="tip_engine">
+            <option value="whisperx">WhisperX — word-level + speakers ★</option>
+            <option value="mlx">mlx-whisper — fastest on Apple Silicon</option>
+            <option value="openai">openai-whisper — most compatible</option>
+            <option value="auto">Auto — WhisperX → mlx → openai</option>
+          </select>
+        </div>
+        <div class="setting-row" style="margin-top:10px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_diar">Speaker Labels</div>
+            <div class="setting-desc" data-i18n="ds_diar">Tags who is speaking. WhisperX only — needs a free HuggingFace token.</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_diar">
+            <input type="checkbox" id="set-diarize" onchange="onSettingChange('diarize', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="setting-row" style="margin-top:10px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_autopunct">Auto-punctuation</div>
+            <div class="setting-desc" data-i18n="ds_autopunct">Restore punctuation &amp; casing right after transcribing</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_autopunct">
+            <input type="checkbox" id="set-autopunct" onchange="onSettingChange('autoPunctuate', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_cleanup">Transcript Clean-up</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_autocleanup">Auto clean-up</div>
+            <div class="setting-desc" data-i18n="ds_autocleanup">Apply dictionary &amp; remove fillers when transcription finishes</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_autocleanup">
+            <input type="checkbox" id="set-autocleanup" onchange="onSettingChange('autoCleanup', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="setting-sub" style="display:block">
+          <div class="setting-slider-header"><span data-i18n="lbl_dict">Custom dictionary</span></div>
+          <textarea id="set-dict" class="settings-textarea" rows="4"
+                    placeholder="wrong=right&#10;istanbul=İstanbul&#10;chat gpt=ChatGPT"
+                    oninput="onSettingChange('customDict', this.value)"></textarea>
+          <div class="setting-hint" data-i18n="hint_dict">Fixes names, brands &amp; mis-hearings. Format: wrong=right (whole word, case-insensitive).</div>
+        </div>
+
+        <div class="setting-row" style="margin-top:12px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_filler">Filler words</div>
+            <div class="setting-desc" data-i18n="ds_filler">Include the built-in list (ee, ıı, şey, um, uh…)</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_filler">
+            <input type="checkbox" id="set-filleron" onchange="onSettingChange('fillerOn', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="setting-sub" style="display:block">
+          <div class="setting-slider-header"><span data-i18n="lbl_extrafiller">Extra fillers to remove</span></div>
+          <textarea id="set-fillers" class="settings-textarea" rows="2"
+                    placeholder="açıkçası, aslında, bir nevi"
+                    oninput="onSettingChange('fillerWords', this.value)"></textarea>
+        </div>
+
+        <div class="setting-sub" style="display:block">
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-name" data-i18n="nm_prof">Profanity filter</div>
+              <div class="setting-desc" data-i18n="ds_prof">How to handle matched words</div>
+            </div>
+            <select id="set-profmode" style="max-width:130px" onchange="onSettingChange('profanityMode', this.value)" data-i18n-tip="tip_profmode">
+              <option value="asterisk">s***</option>
+              <option value="remove">—</option>
+            </select>
+          </div>
+          <div class="setting-slider-header" style="margin-top:8px"><span data-i18n="lbl_extraprof">Extra words to censor</span></div>
+          <textarea id="set-profanity" class="settings-textarea" rows="2"
+                    placeholder="word1, word2"
+                    oninput="onSettingChange('profanityList', this.value)"></textarea>
+          <div class="setting-hint" data-i18n="hint_cleanrun">Run any of these from the 🧹 menu on the Subtitles tab.</div>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_quality">Subtitle Quality</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_autoformat">Auto-format subtitles</div>
+            <div class="setting-desc" data-i18n="ds_autoformat">Split long / over-fast subtitles to broadcast standards</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_autoformat">
+            <input type="checkbox" id="set-autosplit" onchange="onSettingChange('autoSplit', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="setting-sub" id="autosplit-sub" style="display:none">
+          <div class="setting-slider-header"><span data-i18n="lbl_cpl">Max characters per line</span><span class="setting-value" id="cpl-val">42</span></div>
+          <input type="range" class="setting-slider" id="set-cpl" min="20" max="60" step="1" value="42" data-i18n-tip="tip_cpl"
+                 oninput="onSettingChange('maxCharsPerLine', +this.value); $('cpl-val').textContent = this.value">
+
+          <div class="setting-slider-header" style="margin-top:10px"><span data-i18n="lbl_lines">Max lines</span><span class="setting-value" id="lines-val">2</span></div>
+          <input type="range" class="setting-slider" id="set-lines" min="1" max="3" step="1" value="2" data-i18n-tip="tip_lines2"
+                 oninput="onSettingChange('maxLines', +this.value); $('lines-val').textContent = this.value">
+
+          <div class="setting-slider-header" style="margin-top:10px"><span data-i18n="lbl_cps">Max reading speed (chars/sec)</span><span class="setting-value" id="cps-val">17</span></div>
+          <input type="range" class="setting-slider" id="set-cps" min="10" max="30" step="1" value="17" data-i18n-tip="tip_cps"
+                 oninput="onSettingChange('maxCps', +this.value); $('cps-val').textContent = this.value">
+
+          <div class="setting-slider-header" style="margin-top:10px"><span data-i18n="lbl_maxdur">Max subtitle duration</span><span class="setting-value" id="maxdur-val">7.0s</span></div>
+          <input type="range" class="setting-slider" id="set-maxdur" min="2" max="10" step="0.5" value="7" data-i18n-tip="tip_maxdur"
+                 oninput="onSettingChange('maxDur', +this.value); $('maxdur-val').textContent = (+this.value).toFixed(1)+'s'">
+          <div class="setting-hint" data-i18n="hint_split">Subtitles longer than this (or too fast to read) are split at word boundaries.</div>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px"><span data-i18n="sec_style">Subtitle Style</span> <span class="muted">(.ass)</span></div>
+      <div class="setting-item">
+        <div class="style-preview" id="style-preview" data-i18n-tip="tip_stylepreview">
+          <span id="style-preview-text">Örnek altyazı</span>
+        </div>
+        <div class="style-chips" id="style-chips" data-i18n-tip="tip_stylechips"></div>
+
+        <!-- Custom style editor -->
+        <div id="custom-style-form" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border)">
+          <div class="custom-row">
+            <div class="custom-field">
+              <label class="custom-label" data-i18n="lbl_textcolor">Text color</label>
+              <input type="color" id="cust-primary" value="#FFFFFF"
+                     oninput="updateCustomStyle('primary', this.value.slice(1).toUpperCase())">
+            </div>
+            <div class="custom-field">
+              <label class="custom-label" data-i18n="lbl_outlinecolor">Outline color</label>
+              <input type="color" id="cust-outline" value="#000000"
+                     oninput="updateCustomStyle('outline', this.value.slice(1).toUpperCase())">
+            </div>
+          </div>
+          <div class="setting-slider-header" style="margin-top:10px">
+            <span data-i18n="lbl_size">Size</span><span class="setting-value" id="cust-size-val">54</span>
+          </div>
+          <input type="range" class="setting-slider" id="cust-size" min="24" max="100" step="2" value="54"
+                 oninput="updateCustomStyle('size', +this.value); $('cust-size-val').textContent = this.value">
+
+          <div class="setting-slider-header" style="margin-top:8px">
+            <span data-i18n="lbl_outlinew">Outline width</span><span class="setting-value" id="cust-ow-val">3</span>
+          </div>
+          <input type="range" class="setting-slider" id="cust-ow" min="0" max="8" step="1" value="3"
+                 oninput="updateCustomStyle('outlineW', +this.value); $('cust-ow-val').textContent = this.value">
+
+          <div class="custom-row" style="margin-top:10px; align-items:center; gap:14px">
+            <label class="find-opt" style="gap:5px">
+              <input type="checkbox" id="cust-bold" onchange="updateCustomStyle('bold', this.checked)">
+              <span style="color:var(--text2);font-size:11px" data-i18n="lbl_bold">Bold</span>
+            </label>
+            <label class="find-opt" style="gap:5px">
+              <input type="checkbox" id="cust-box" onchange="updateCustomStyle('box', this.checked)">
+              <span style="color:var(--text2);font-size:11px" data-i18n="lbl_box">Box bg</span>
+            </label>
+            <select id="cust-align" style="flex:1" onchange="updateCustomStyle('align', +this.value)">
+              <option value="2" data-i18n="opt_bottom">Bottom</option>
+              <option value="8" data-i18n="opt_top">Top</option>
+              <option value="5" data-i18n="opt_center">Center</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-hint" style="margin-top:8px" data-i18n="hint_style">Applies to .ass exports. SRT / Premiere captions carry no styling.</div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px"><span data-i18n="sec_karaoke">Karaoke</span> <span class="muted">(Instagram / TikTok)</span></div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_karaoke">Word-by-word highlight</div>
+            <div class="setting-desc" data-i18n="ds_karaoke">Each word lights up as spoken. Exports as karaoke .ass (needs word timing).</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_karaoke">
+            <input type="checkbox" id="set-karaoke" onchange="onKaraokeToggle(this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="setting-sub" id="karaoke-sub" style="display:none">
+          <div class="karaoke-preview" id="karaoke-preview"></div>
+          <div class="custom-row" style="margin-top:10px; align-items:center">
+            <div class="custom-field" style="max-width:140px">
+              <label class="custom-label" data-i18n="lbl_hicolor">Highlight colour</label>
+              <input type="color" id="set-karaoke-hi" value="#FFE000" data-i18n-tip="tip_hicolor"
+                     oninput="onKaraokeColor(this.value)">
+            </div>
+          </div>
+          <div class="setting-hint" style="margin-top:8px" data-i18n="hint_karaoke">Open the .ass in CapCut, VLC or Premiere. Spoken words switch to the highlight colour.</div>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_timing">Subtitle Timing</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_continuous">Continuous subtitles</div>
+            <div class="setting-desc" data-i18n="ds_continuous">Extend each subtitle to the next, filling short gaps</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_continuous">
+            <input type="checkbox" id="set-gap-fill" onchange="onGapFillChange()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="setting-sub" id="gap-fill-sub" style="display:none">
+          <div class="setting-slider-header">
+            <span data-i18n="lbl_maxgap">Max gap to fill</span>
+            <span class="setting-value" id="gap-fill-val">2.0s</span>
+          </div>
+          <input type="range" class="setting-slider" id="set-gap-max"
+                 min="0.1" max="5.0" step="0.1" value="2.0" data-i18n-tip="tip_maxgap"
+                 oninput="onGapMaxChange(this.value)">
+          <div class="setting-hint" data-i18n="hint_gap">Gaps larger than this stay separate.</div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /panel-tx-settings -->
+
+
+  <!-- ═══ PANEL: EDIT — WORK ═══ -->
+  <div id="panel-ed-work" class="panel" style="display:none">
+
+    <div class="status-bar info" id="silence-status-bar" data-i18n="ed_intro">Automated editing for the In/Out selection.</div>
+    <div class="progress-wrap"><div class="progress-bar" id="silence-progress-bar"></div></div>
+
+    <div class="setup-scroll">
+
+      <div class="setup-section-title" data-i18n="sec_silence">Silence</div>
+      <div class="setting-item">
+        <button class="btn-transcribe btn-compact" id="silence-btn" onclick="detectSilences()" style="margin-top:0;margin-bottom:7px" data-i18n-tip="tip_mark">
+          <span class="ico">🔖</span><span data-i18n="btn_mark">Detect &amp; Mark Silences</span>
+        </button>
+        <button class="btn-transcribe btn-compact btn-warn" id="silence-cut-btn" onclick="cutSilences()" data-i18n-tip="tip_cut">
+          <span class="ico">✂️</span><span data-i18n="btn_cut">Cut Silences (ripple delete)</span>
+        </button>
+        <div class="setting-hint" style="margin-top:8px" data-i18n="hint_cut">Cut is experimental — best on simple single-camera timelines. Undo with Ctrl/Cmd+Z.</div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_zoom">Auto Zoom</div>
+      <div class="setting-item">
+        <p class="panel-intro" data-i18n="ds_zoom">Adds a subtle slow push-in to each clip in the selection for energy — like AutoCut/FireCut.</p>
+        <button class="btn-transcribe btn-compact" id="zoom-btn" onclick="applyAutoZoom()" style="margin-top:0" data-i18n-tip="tip_zoom">
+          <span class="ico">⚡</span><span data-i18n="btn_zoom">Apply Auto Zoom</span>
+        </button>
+        <div class="setting-hint" style="margin-top:8px" data-i18n="hint_zoom">Adds Motion → Scale keyframes to clips in the In/Out range. Experimental — undo with Ctrl/Cmd+Z.</div>
+      </div>
+
+    </div>
+  </div><!-- /panel-ed-work -->
+
+
+  <!-- ═══ PANEL: EDIT — SETTINGS ═══ -->
+  <div id="panel-ed-settings" class="panel" style="display:none">
+    <div class="setup-scroll">
+
+      <div class="setup-section-title" data-i18n="sec_detect">Detection Settings</div>
+      <div class="setting-item">
+        <div class="setting-slider-header">
+          <span data-i18n="lbl_silthr">Silence threshold</span>
+          <span class="setting-value" id="silthr-val">-30 dB</span>
+        </div>
+        <input type="range" class="setting-slider" id="set-silthr" min="-60" max="-10" step="1" value="-30" data-i18n-tip="tip_silthr"
+               oninput="onSettingChange('silenceThreshold', +this.value); $('silthr-val').textContent = this.value + ' dB'">
+
+        <div class="setting-slider-header" style="margin-top:12px">
+          <span data-i18n="lbl_sildur">Min silence length</span>
+          <span class="setting-value" id="sildur-val">0.6s</span>
+        </div>
+        <input type="range" class="setting-slider" id="set-sildur" min="0.2" max="3.0" step="0.1" value="0.6" data-i18n-tip="tip_sildur"
+               oninput="onSettingChange('silenceMinDur', +this.value); $('sildur-val').textContent = (+this.value).toFixed(1)+'s'">
+
+        <div class="setting-slider-header" style="margin-top:12px">
+          <span data-i18n="lbl_silpad">Cut padding (keep around speech)</span>
+          <span class="setting-value" id="silpad-val">0.05s</span>
+        </div>
+        <input type="range" class="setting-slider" id="set-silpad" min="0" max="0.5" step="0.05" value="0.05" data-i18n-tip="tip_silpad"
+               oninput="onSettingChange('silencePad', +this.value); $('silpad-val').textContent = (+this.value).toFixed(2)+'s'">
+
+        <div class="setting-hint" style="margin-top:8px" data-i18n="hint_sil">Lower dB = only deeper silences count. Raise length to skip brief pauses. Padding leaves breath when cutting.</div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_zoom">Auto Zoom</div>
+      <div class="setting-item">
+        <div class="setting-slider-header">
+          <span data-i18n="lbl_zoomamt">Zoom amount</span>
+          <span class="setting-value" id="zoomamt-val">8%</span>
+        </div>
+        <input type="range" class="setting-slider" id="set-zoomamt" min="2" max="20" step="1" value="8" data-i18n-tip="tip_zoomamt"
+               oninput="onSettingChange('zoomAmount', +this.value); $('zoomamt-val').textContent = this.value + '%'">
+
+        <div class="setting-row" style="margin-top:12px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="lbl_zoomstyle">Zoom style</div>
+          </div>
+          <select id="set-zoomstyle" style="max-width:150px" onchange="onSettingChange('zoomStyle', this.value)" data-i18n-tip="tip_zoomstyle">
+            <option value="alternate" data-i18n="opt_zoom_alt">Alternate in / out</option>
+            <option value="in" data-i18n="opt_zoom_in">Always push-in</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /panel-ed-settings -->
+
+
+  <!-- ═══ PANEL: AUDIO — WORK ═══ -->
+  <div id="panel-au-work" class="panel" style="display:none">
+
+    <div class="status-bar info" id="audio-status-bar" data-i18n="au_intro">Audio tools for the In/Out selection.</div>
+    <div class="progress-wrap"><div class="progress-bar" id="audio-progress-bar"></div></div>
+
+    <div class="setup-scroll">
+      <div class="setup-section-title" data-i18n="sec_enhance">Enhance</div>
+      <div class="setting-item">
+        <p class="panel-intro" data-i18n="hint_enhance">Cleans the In/Out audio (denoise + loudness normalize) and imports it to a “Whisper Audio” bin.</p>
+        <button class="btn-transcribe btn-compact" id="enhance-btn" onclick="enhanceAudio()" style="margin-top:0" data-i18n-tip="tip_enhance">
+          <span class="ico">🎚</span><span data-i18n="btn_enhance">Enhance Audio — denoise + normalize</span>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /panel-au-work -->
+
+
+  <!-- ═══ PANEL: AUDIO — SETTINGS ═══ -->
+  <div id="panel-au-settings" class="panel" style="display:none">
+    <div class="setup-scroll">
+
+      <div class="setup-section-title" data-i18n="sec_enhance">Enhance</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_denoise">Denoise</div>
+            <div class="setting-desc" data-i18n="ds_denoise">High-pass + FFT noise reduction (removes hiss/hum)</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_denoise">
+            <input type="checkbox" id="set-audio-denoise" onchange="onSettingChange('audioDenoise', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="setting-row" style="margin-top:10px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_normalize">Loudness normalize</div>
+            <div class="setting-desc" data-i18n="ds_normalize">EBU R128 to −16 LUFS — consistent, social-ready volume</div>
+          </div>
+          <label class="toggle" data-i18n-tip="tip_normalize">
+            <input type="checkbox" id="set-audio-normalize" onchange="onSettingChange('audioNormalize', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /panel-au-settings -->
+
+
+  <!-- ═══ PANEL: SETUP ═══ -->
+  <div id="panel-setup" class="panel" style="display:none">
+    <div class="setup-scroll">
+
+      <div class="setup-section-title" data-i18n="sec_syscheck">System Check</div>
+      <div id="checks-list"><div class="check-loading">Checking…</div></div>
+
+      <div class="setup-section-title" style="margin-top:14px" data-i18n="sec_models">Whisper Models</div>
+      <div id="models-list"><div class="check-loading">Loading…</div></div>
+
+      <div class="setup-section-title" style="margin-top:14px" data-i18n="sec_install">Install Notes</div>
+      <div class="setup-notes" id="setup-notes"></div>
+
+      <div class="setup-btn-row">
+        <button class="btn-recheck" onclick="runDiagnostics()" data-i18n-tip="tip_recheck">🔄 <span data-i18n="btn_recheck">Re-check</span></button>
+        <button class="btn-reload"  onclick="reloadExtension()" data-i18n-tip="tip_reload">↺ <span data-i18n="btn_reload">Reload Extension</span></button>
+      </div>
+
+    </div>
+  </div><!-- /panel-setup -->
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/CSInterface.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
