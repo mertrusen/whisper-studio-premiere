@@ -539,51 +539,38 @@ const setupBadge     = $("setup-badge");
 const IS_WIN = (typeof process !== "undefined" && process.platform === "win32");
 let _pythonCache = null;
 
-// Ask a launcher for its real interpreter path, going THROUGH the shell so it
-// resolves exactly like the user's Terminal/CMD does.
-function _resolvePythonViaShell(launcher) {
-    try {
-        const { execSync } = _req("child_process");
-        const out = execSync(`${launcher} -c "import sys;print(sys.executable)"`, {
-            timeout: 12000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"],
-        }).toString().trim();
-        if (out && fs.existsSync(out)) return out;
-    } catch (e) {}
+// Fast, filesystem-only Windows scan (covers classic Programs\Python\Python3xx
+// AND the newer %LOCALAPPDATA%\Python\pythoncore-3.xx-64 layout). readdir/exists
+// are ~instant, so this never freezes the UI.
+function _scanWinPython() {
+    const la = process.env.LOCALAPPDATA || "";
+    const roots = [];
+    if (la) { roots.push(la + "\\Python", la + "\\Programs\\Python"); }
+    if (process.env.PROGRAMFILES) roots.push(process.env.PROGRAMFILES);
+    if (process.env["PROGRAMFILES(X86)"]) roots.push(process.env["PROGRAMFILES(X86)"]);
+    roots.push("C:\\");
+    for (const r of roots) {
+        let names;
+        try { names = fs.readdirSync(r); } catch (e) { continue; }
+        names.sort().reverse();   // prefer the highest version folder
+        for (const name of names) {
+            if (!/^(python|pythoncore)/i.test(name)) continue;
+            const exe = r + "\\" + name + "\\python.exe";
+            try { if (fs.existsSync(exe)) return exe; } catch (e) {}
+        }
+    }
     return null;
 }
 
+// SYNCHRONOUS, NON-BLOCKING lookup — filesystem only, no shell/execSync (a
+// blocking shell call here froze the UI → "Not Responding" on Windows).
 function findPython() {
     if (_pythonCache) return _pythonCache;
-
     if (IS_WIN) {
-        // 1) Resolve a real python.exe via the launcher (shell-resolved, like terminal)
-        for (const launcher of ["py -3", "py", "python", "python3"]) {
-            const full = _resolvePythonViaShell(launcher);
-            if (full) { _pythonCache = full; return full; }
-        }
-        // 2) Scan real install roots for any python.exe — covers BOTH the classic
-        //    %LOCALAPPDATA%\Programs\Python\Python3xx AND the newer
-        //    %LOCALAPPDATA%\Python\pythoncore-3.xx-64 layout, plus Program Files.
-        const la = process.env.LOCALAPPDATA || "";
-        const roots = [];
-        if (la) { roots.push(la + "\\Python", la + "\\Programs\\Python"); }
-        if (process.env.PROGRAMFILES) roots.push(process.env.PROGRAMFILES);
-        if (process.env["PROGRAMFILES(X86)"]) roots.push(process.env["PROGRAMFILES(X86)"]);
-        roots.push("C:\\");
-        for (const r of roots) {
-            let names;
-            try { names = fs.readdirSync(r); } catch (e) { continue; }
-            names.sort().reverse();   // prefer the highest version folder
-            for (const name of names) {
-                if (!/^(python|pythoncore)/i.test(name)) continue;
-                const exe = r + "\\" + name + "\\python.exe";
-                try { if (fs.existsSync(exe)) { _pythonCache = exe; return exe; } } catch (e) {}
-            }
-        }
-        return "py";   // last resort — NOT cached, so the next call re-probes
+        const found = _scanWinPython();
+        if (found) { _pythonCache = found; return found; }
+        return "py";   // fallback (uncached); resolvePythonAsync may set a real path
     }
-
-    // macOS / Linux — known absolute locations first, then shell-resolved
     const candidates = [
         "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
         "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
@@ -595,9 +582,34 @@ function findPython() {
     for (const p of candidates) {
         try { if (fs.existsSync(p)) { _pythonCache = p; return p; } } catch (e) {}
     }
-    const shellResolved = _resolvePythonViaShell("python3") || _resolvePythonViaShell("python");
-    _pythonCache = shellResolved || "python3";
-    return _pythonCache;
+    return "python3";
+}
+
+// ASYNC backstop — resolves the real interpreter path via the launcher WITHOUT
+// blocking the UI (async exec). Run once at startup; refines _pythonCache for
+// non-standard installs the filesystem scan can't see.
+function resolvePythonAsync() {
+    return new Promise(resolve => {
+        if (_pythonCache && (_pythonCache.indexOf("/") >= 0 || _pythonCache.indexOf("\\") >= 0)) { resolve(); return; }
+        let cp;
+        try { cp = _req("child_process"); } catch (e) { resolve(); return; }
+        const launchers = IS_WIN ? ["py -3", "py", "python", "python3"] : ["python3", "python"];
+        let i = 0;
+        const tryNext = () => {
+            if (i >= launchers.length) { resolve(); return; }
+            const launcher = launchers[i++];
+            try {
+                cp.exec(`${launcher} -c "import sys;print(sys.executable)"`,
+                    { timeout: 15000, windowsHide: true },
+                    (err, stdout) => {
+                        const p = (stdout || "").trim();
+                        if (!err && p) { try { if (fs.existsSync(p)) { _pythonCache = p; return resolve(); } } catch (e) {} }
+                        tryNext();
+                    });
+            } catch (e) { tryNext(); }
+        };
+        tryNext();
+    });
 }
 
 function extDir()     { return csInterface.getSystemPath(SystemPath.EXTENSION); }
@@ -2648,8 +2660,9 @@ function initTooltips() {
         }
     });
 
-    // Background startup check
-    runPython("check_setup.py", []).then(data => {
+    // Background startup check — resolve the precise python path first (async,
+    // never blocks the UI), then run the diagnostic.
+    resolvePythonAsync().then(() => runPython("check_setup.py", [])).then(data => {
         diagData = data;
         if (!data || !data._ready) {
             setupIndicator.className = "setup-indicator warn";
