@@ -17,6 +17,7 @@
       </div>
     </div>
     <div class="header-right">
+      <button id="theme-btn" class="icon-btn" onclick="cycleTheme()" data-i18n-tip="tip_theme"></button>
       <select id="header-lang" class="lang-select" onchange="setLanguage(this.value)" data-i18n-tip="tip_uilang">
         <option value="en">EN</option>
         <option value="tr">TR</option>
@@ -211,6 +212,16 @@
           <select id="set-uilang" style="max-width:120px" onchange="setLanguage(this.value)" data-i18n-tip="tip_uilang">
             <option value="en">English</option>
             <option value="tr">Türkçe</option>
+          </select>
+        </div>
+        <div class="setting-row" style="margin-top:12px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="lbl_theme">Appearance</div>
+          </div>
+          <select id="set-theme" style="max-width:120px" onchange="setTheme(this.value)" data-i18n-tip="tip_theme">
+            <option value="dark"  data-i18n="theme_dark">Dark</option>
+            <option value="light" data-i18n="theme_light">Light</option>
+            <option value="auto"  data-i18n="theme_auto">Auto</option>
           </select>
         </div>
       </div>

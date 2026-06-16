@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS = {
     silencePad:       0.05,       // seconds kept around speech when ripple-cutting
     customStyle:      null,
     uiLang:           "en",       // interface language: en | tr
+    theme:            "dark",     // dark | light | auto
     // ── Transcript clean-up ──
     customDict:      "",          // one "wrong=right" rule per line
     autoCleanup:     false,       // apply dictionary + fillers automatically after transcribe
@@ -134,6 +135,8 @@ const I18N = {
     sec_audio: "Audio Enhancement", sec_quality: "Subtitle Quality",
     sec_style: "Subtitle Style", sec_karaoke: "Karaoke", sec_timing: "Subtitle Timing",
     sec_interface: "Interface", lbl_uilang: "Language", sec_modellang: "Model & Language",
+    lbl_theme: "Appearance", theme_dark: "Dark", theme_light: "Light", theme_auto: "Auto",
+    tip_theme: "Switch appearance — Dark / Light / Auto (follow system)",
     // settings items
     nm_engine: "Engine", ds_engine: "WhisperX gives the most accurate word timing + speaker labels",
     nm_diar: "Speaker Labels", ds_diar: "Tags who is speaking. WhisperX only — needs a free HuggingFace token.",
@@ -283,6 +286,8 @@ const I18N = {
     sec_audio: "Ses İyileştirme", sec_quality: "Altyazı Kalitesi",
     sec_style: "Altyazı Stili", sec_karaoke: "Karaoke", sec_timing: "Altyazı Zamanlaması",
     sec_interface: "Arayüz", lbl_uilang: "Dil", sec_modellang: "Model & Dil",
+    lbl_theme: "Görünüm", theme_dark: "Koyu", theme_light: "Açık", theme_auto: "Otomatik",
+    tip_theme: "Görünümü değiştir — Koyu / Açık / Otomatik (sistemi takip et)",
     nm_engine: "Motor", ds_engine: "WhisperX en doğru kelime zamanı + konuşmacı etiketi verir",
     nm_diar: "Konuşmacı Etiketleri", ds_diar: "Kim konuşuyor etiketler. Sadece WhisperX — ücretsiz HuggingFace token gerekir.",
     nm_autopunct: "Otomatik noktalama", ds_autopunct: "Transkripsiyon biter bitmez noktalama ve büyük harfleri düzeltir",
@@ -470,6 +475,9 @@ const ICONS = {
     alert:     '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
     globe:     '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
     sliders:   '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+    sun:       '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+    moon:      '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+    auto:      '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
 };
 
 function icon(name) {
@@ -482,6 +490,30 @@ function applyIcons(root) {
         const name = el.getAttribute("data-icon");
         if (name && ICONS[name]) el.innerHTML = icon(name);
     });
+}
+
+// ── Theme (dark / light / auto) ────────────────────────────────────────────
+function resolveTheme() {
+    if (settings.theme === "light") return "light";
+    if (settings.theme === "dark")  return "dark";
+    try { return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; }
+    catch (e) { return "dark"; }
+}
+function applyTheme() {
+    document.documentElement.setAttribute("data-theme", resolveTheme());
+    const tb = $("theme-btn");
+    if (tb) tb.innerHTML = icon(settings.theme === "auto" ? "auto" : (resolveTheme() === "light" ? "sun" : "moon"));
+    const sel = $("set-theme"); if (sel) sel.value = settings.theme;
+}
+function setTheme(v) {
+    settings.theme = (["dark", "light", "auto"].indexOf(v) >= 0) ? v : "dark";
+    saveSettings();
+    applyTheme();
+}
+function cycleTheme() {
+    const order = ["dark", "light", "auto"];
+    setTheme(order[(order.indexOf(settings.theme) + 1) % 3]);
+    showToast(t("theme_" + settings.theme), "info", 1400);
 }
 
 // ── DOM helpers ───────────────────────────────────────────────────────────
@@ -758,6 +790,7 @@ function initSettingsUI() {
     const txt = (id, v) => { const el = $(id); if (el) el.textContent = v; };
 
     set("set-uilang", settings.uiLang);
+    set("set-theme", settings.theme);
     set("set-engine", settings.engine);
     chk("set-diarize", settings.diarize);
     chk("set-autopunct", settings.autoPunctuate);
@@ -2570,8 +2603,10 @@ function initTooltips() {
 (function init() {
     loadHostJSX();
 
+    applyTheme();
     applyLanguage();
     applyIcons();
+    applyTheme();   // refresh theme-btn icon now that icon() output is in place
     renderSegments();
     initTooltips();
     const hl = $("header-lang"); if (hl) hl.value = settings.uiLang;
