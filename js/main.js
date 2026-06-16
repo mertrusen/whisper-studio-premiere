@@ -545,7 +545,7 @@ function _resolvePythonViaShell(launcher) {
     try {
         const { execSync } = _req("child_process");
         const out = execSync(`${launcher} -c "import sys;print(sys.executable)"`, {
-            timeout: 9000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"],
+            timeout: 12000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"],
         }).toString().trim();
         if (out && fs.existsSync(out)) return out;
     } catch (e) {}
@@ -561,20 +561,26 @@ function findPython() {
             const full = _resolvePythonViaShell(launcher);
             if (full) { _pythonCache = full; return full; }
         }
-        // 2) Scan standard install locations directly (per-user + system, 3.10–3.13)
+        // 2) Scan real install roots for any python.exe — covers BOTH the classic
+        //    %LOCALAPPDATA%\Programs\Python\Python3xx AND the newer
+        //    %LOCALAPPDATA%\Python\pythoncore-3.xx-64 layout, plus Program Files.
         const la = process.env.LOCALAPPDATA || "";
-        const pf = process.env.PROGRAMFILES || "C:\\Program Files";
-        const guesses = [];
-        ["313", "312", "311", "310"].forEach(v => {
-            if (la) guesses.push(`${la}\\Programs\\Python\\Python${v}\\python.exe`);
-            guesses.push(`${pf}\\Python${v}\\python.exe`);
-            guesses.push(`C:\\Python${v}\\python.exe`);
-        });
-        for (const g of guesses) {
-            try { if (fs.existsSync(g)) { _pythonCache = g; return g; } } catch (e) {}
+        const roots = [];
+        if (la) { roots.push(la + "\\Python", la + "\\Programs\\Python"); }
+        if (process.env.PROGRAMFILES) roots.push(process.env.PROGRAMFILES);
+        if (process.env["PROGRAMFILES(X86)"]) roots.push(process.env["PROGRAMFILES(X86)"]);
+        roots.push("C:\\");
+        for (const r of roots) {
+            let names;
+            try { names = fs.readdirSync(r); } catch (e) { continue; }
+            names.sort().reverse();   // prefer the highest version folder
+            for (const name of names) {
+                if (!/^(python|pythoncore)/i.test(name)) continue;
+                const exe = r + "\\" + name + "\\python.exe";
+                try { if (fs.existsSync(exe)) { _pythonCache = exe; return exe; } } catch (e) {}
+            }
         }
-        _pythonCache = "py";   // last resort
-        return _pythonCache;
+        return "py";   // last resort — NOT cached, so the next call re-probes
     }
 
     // macOS / Linux — known absolute locations first, then shell-resolved
@@ -604,10 +610,13 @@ function scriptsDir() { return path.join(extDir(), "scripts"); }
 // already has Python/ffmpeg; prepending POSIX paths would CORRUPT it (this was
 // the root cause of "Could not run Python" on Windows).
 function spawnEnv() {
-    if (IS_WIN) return Object.assign({}, process.env);
+    // Force Python to emit UTF-8 on stdout — otherwise on Windows it uses the
+    // locale codepage (e.g. cp1254) and Turkish/Unicode text comes back as � .
+    const utf8 = { PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" };
+    if (IS_WIN) return Object.assign({}, process.env, utf8);
     const extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin";
     const cur   = process.env.PATH || "";
-    return Object.assign({}, process.env, {
+    return Object.assign({}, process.env, utf8, {
         PATH: cur.includes("/opt/homebrew") ? cur : extra + ":" + cur
     });
 }
@@ -619,9 +628,13 @@ function runPython(scriptName, args, onStderr) {
         const proc   = spawn(py, [script, ...args], { env: spawnEnv() });
         const STDERR_CAP = 8000;
         let stdout = "", stderr = "";
-        proc.stdout.on("data", d => { stdout += d.toString(); });
+        // setEncoding("utf8") decodes correctly even when a multi-byte char is
+        // split across chunks (raw .toString() per chunk can corrupt them).
+        proc.stdout.setEncoding("utf8");
+        proc.stderr.setEncoding("utf8");
+        proc.stdout.on("data", d => { stdout += d; });
         proc.stderr.on("data", d => {
-            const chunk = d.toString();
+            const chunk = d;
             if (onStderr) onStderr(chunk);
             stderr += chunk;
             if (stderr.length > STDERR_CAP) stderr = stderr.slice(-STDERR_CAP);
