@@ -604,6 +604,21 @@ function findPython() {
 function resolvePythonAsync() {
     return new Promise(resolve => {
         if (_pythonCache && (_pythonCache.indexOf("/") >= 0 || _pythonCache.indexOf("\\") >= 0)) { resolve(); return; }
+        
+        if (!IS_WIN) {
+            const candidates = [
+                "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3",
+                "/opt/homebrew/bin/python3",
+                "/usr/local/bin/python3"
+            ];
+            for (const p of candidates) {
+                try { if (fs.existsSync(p)) { _pythonCache = p; return resolve(); } } catch (e) {}
+            }
+        }
+
         let cp;
         try { cp = _req("child_process"); } catch (e) { resolve(); return; }
         const launchers = IS_WIN ? ["py -3", "py", "python", "python3"] : ["python3", "python"];
@@ -702,7 +717,7 @@ function runCmd(cmd, args) {
         } catch(e) {}
     }
     return new Promise(resolve => {
-        const proc = spawn(cmd, args);
+        const proc = spawn(cmd, args, { env: spawnEnv() });
         let out = "", err = "";
         proc.stdout.on("data", d => { out += d.toString(); });
         proc.stderr.on("data", d => { err += d.toString(); });
@@ -2864,6 +2879,39 @@ function initTooltips() {
             });
         }
     });
+
+    if (!IS_DESKTOP()) {
+        setInterval(async () => {
+            if (!segments || segments.length === 0 || isRunning) return;
+            const res = await evalScript("app.project.activeSequence ? app.project.activeSequence.getPlayerPosition().seconds : -1");
+            const t = parseFloat(res);
+            if (isNaN(t) || t < 0) return;
+            
+            let activeIdx = -1;
+            for (let i = 0; i < segments.length; i++) {
+                if (t >= segments[i].seqStart && t <= segments[i].seqEnd) {
+                    activeIdx = i; break;
+                }
+            }
+            
+            const wrap = $("segments-wrap");
+            if (wrap && activeIdx >= 0) {
+                const nodes = wrap.querySelectorAll(".segment");
+                nodes.forEach((n, i) => {
+                    if (i === activeIdx) {
+                        if (!n.classList.contains("playing")) {
+                            n.classList.add("playing");
+                            n.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }
+                    } else {
+                        n.classList.remove("playing");
+                    }
+                });
+            } else if (wrap) {
+                wrap.querySelectorAll(".segment.playing").forEach(n => n.classList.remove("playing"));
+            }
+        }, 300);
+    }
 
     // Background startup check — resolve the precise python path first (async,
     // never blocks the UI), then run the diagnostic.

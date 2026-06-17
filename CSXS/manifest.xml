@@ -2,12 +2,12 @@
 <ExtensionManifest
   Version="11.0"
   ExtensionBundleId="com.whisper.studio"
-  ExtensionBundleVersion="1.2.14"
+  ExtensionBundleVersion="1.2.15"
   ExtensionBundleName="Subsper"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <ExtensionList>
-    <Extension Id="com.whisper.studio.panel" Version="1.2.14"/>
+    <Extension Id="com.whisper.studio.panel" Version="1.2.15"/>
   </ExtensionList>
 
   <ExecutionEnvironment>
