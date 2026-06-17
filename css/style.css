@@ -526,3 +526,4 @@ mark.find-hit { background: var(--yellow); color: #1a1206; border-radius: 3px; p
 .toast.success { border-left: 3px solid var(--green); }
 .toast.error   { border-left: 3px solid var(--red); }
 .toast.info    { border-left: 3px solid var(--accent); }
+.segment.playing { border-left: 2px solid var(--accent); background: var(--bg3); }

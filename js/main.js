@@ -16,7 +16,7 @@ let lastLanguage = "";
 
 // ── Settings (persisted to localStorage) ──────────────────────────────────
 const DEFAULT_SETTINGS = {
-    engine:          "auto",      // try whisperx → mlx → openai; works with whatever is installed
+    engine:          "cpp",       // bundled whisper.cpp — zero setup. Pro: whisperx/mlx/openai (Python)
     diarize:         false,
     autoPunctuate:   false,
     autoSplit:       true,
@@ -51,6 +51,7 @@ const DEFAULT_SETTINGS = {
     // ── Edit automation ──
     zoomAmount:      8,           // % push-in per clip
     zoomStyle:       "alternate", // alternate | in
+    threads:         0,           // whisper.cpp threads (0 = auto: use all CPU cores)
 };
 
 // Built-in filler words (Turkish + English). Phrases first so they match before single words.
@@ -116,10 +117,10 @@ const I18N = {
     sub_work_tx: "Edit", sub_settings: "Settings", sub_detect: "Detect",
     // transcribe controls
     lbl_model: "Model", lbl_language: "Language", opt_auto: "Auto detect",
-    btn_transcribe: "Transcribe In/Out Selection", btn_loadsrt: "Load SRT",
+    btn_transcribe: "Transcribe", btn_loadsrt: "Load SRT",
     btn_play: "Play", btn_pause: "Pause",
     btn_enhance: "Enhance Audio — denoise + normalize",
-    empty_p: "Set In (I) and Out (O) points on your timeline, then click Transcribe.",
+    empty_p: "Click Transcribe to subtitle your whole timeline — or set In/Out (I/O) first for just a range.",
     empty_hint: "Click a word to split there · double-click text to edit.",
     // find / replace
     find_ph: "Find…", replace_ph: "Replace with… (optional)",
@@ -138,8 +139,11 @@ const I18N = {
     lbl_theme: "Appearance", theme_dark: "Dark", theme_light: "Light", theme_auto: "Auto",
     tip_theme: "Switch appearance — Dark / Light / Auto (follow system)",
     // settings items
-    nm_engine: "Engine", ds_engine: "WhisperX gives the most accurate word timing + speaker labels",
-    nm_diar: "Speaker Labels", ds_diar: "Tags who is speaking. WhisperX only — needs a free HuggingFace token.",
+    nm_engine: "Engine", ds_engine: "Built-in works instantly with no setup. Pro engines need Python (optional).",
+    opt_eng_cpp: "Subsper Built-in — no setup needed ★", opt_eng_whisperx: "Pro: WhisperX — speaker labels (needs Python)",
+    opt_eng_mlx: "Pro: mlx-whisper — Apple Silicon (needs Python)", opt_eng_openai: "Pro: openai-whisper (needs Python)",
+    pro_unavailable: "Pro engines need Python + WhisperX (optional). Built-in is selected.",
+    nm_diar: "Speaker Labels (Pro)", ds_diar: "Tags who is speaking. Needs the WhisperX Pro engine + a free HuggingFace token.",
     nm_autopunct: "Auto-punctuation", ds_autopunct: "Restore punctuation & casing right after transcribing",
     nm_autocleanup: "Auto clean-up", ds_autocleanup: "Apply dictionary & remove fillers when transcription finishes",
     lbl_dict: "Custom dictionary", hint_dict: "Fixes names, brands & mis-hearings. Format: wrong=right (whole word, case-insensitive).",
@@ -171,7 +175,10 @@ const I18N = {
     hint_sil: "Lower dB = only deeper silences count. Raise length to skip brief pauses. Padding leaves breath when cutting.",
     sil_status: "Detect silences in your In/Out selection",
     // setup
-    sec_syscheck: "System Check", sec_models: "Whisper Models", sec_install: "Install Notes",
+    sec_syscheck: "System Check (optional / Pro)", sec_models: "Whisper Models", sec_install: "Install Notes",
+    setup_optional: "✓ Subsper's built-in engine works out of the box — no setup needed. Everything below is OPTIONAL — install Python + a Pro engine only if you want speaker labels, auto-punctuation, or an alternative engine.",
+    nm_builtin: "Subsper Built-in engine", ds_builtin_ok: "✓ Ready — bundled whisper.cpp + ffmpeg, no setup", ds_builtin_dl: "Bundled — the model downloads on first transcription",
+    py_optional: "Not detected — that's fine. Install Python only for optional Pro features (speaker labels, etc.).",
     btn_recheck: "Re-check", btn_reload: "Reload Extension",
     // tooltips
     tip_tab_transcribe: "Auto-generate and edit subtitles from your video",
@@ -183,7 +190,7 @@ const I18N = {
     tip_sub_sl_settings: "Threshold (dB), minimum length and cut padding",
     tip_model: "Whisper model: turbo = fast & accurate (recommended), large = best but slower, small/base = fast but less accurate",
     tip_lang: "Spoken language. 'Auto detect' finds it — but picking it gives more accurate results",
-    tip_transcribe: "Transcribes the audio in the In (I) / Out (O) range on your timeline",
+    tip_transcribe: "Transcribes the In/Out range — or the WHOLE timeline if no In/Out is set",
     tip_loadsrt: "Load an existing .srt subtitle file and edit it here",
     tip_play: "Play / pause in Premiere. Clicking a segment also jumps there and plays",
     tip_enhance: "Cleans the In/Out audio: reduces noise + balances loudness (−16 LUFS). Imports the clean WAV to the project",
@@ -288,8 +295,11 @@ const I18N = {
     sec_interface: "Arayüz", lbl_uilang: "Dil", sec_modellang: "Model & Dil",
     lbl_theme: "Görünüm", theme_dark: "Koyu", theme_light: "Açık", theme_auto: "Otomatik",
     tip_theme: "Görünümü değiştir — Koyu / Açık / Otomatik (sistemi takip et)",
-    nm_engine: "Motor", ds_engine: "WhisperX en doğru kelime zamanı + konuşmacı etiketi verir",
-    nm_diar: "Konuşmacı Etiketleri", ds_diar: "Kim konuşuyor etiketler. Sadece WhisperX — ücretsiz HuggingFace token gerekir.",
+    nm_engine: "Motor", ds_engine: "Yerleşik motor kurulum gerektirmez, anında çalışır. Pro motorlar Python ister (opsiyonel).",
+    opt_eng_cpp: "Subsper Yerleşik — kurulum gerekmez ★", opt_eng_whisperx: "Pro: WhisperX — konuşmacı etiketi (Python gerekir)",
+    opt_eng_mlx: "Pro: mlx-whisper — Apple Silicon (Python gerekir)", opt_eng_openai: "Pro: openai-whisper (Python gerekir)",
+    pro_unavailable: "Pro motorlar Python + WhisperX ister (opsiyonel). Yerleşik motor seçildi.",
+    nm_diar: "Konuşmacı Etiketleri (Pro)", ds_diar: "Kim konuşuyor etiketler. WhisperX Pro motoru + ücretsiz HuggingFace token gerekir.",
     nm_autopunct: "Otomatik noktalama", ds_autopunct: "Transkripsiyon biter bitmez noktalama ve büyük harfleri düzeltir",
     nm_autocleanup: "Otomatik temizlik", ds_autocleanup: "İş bitince sözlüğü uygular ve dolgu kelimeleri siler",
     lbl_dict: "Özel sözlük", hint_dict: "İsim/marka/yanlış duymaları düzeltir. Format: yanlış=doğru (tam kelime, büyük-küçük fark etmez).",
@@ -319,7 +329,10 @@ const I18N = {
     lbl_silthr: "Sessizlik eşiği", lbl_sildur: "Min. sessizlik süresi", lbl_silpad: "Kesim payı (konuşma etrafı)",
     hint_sil: "Düşük dB = sadece derin sessizlikler. Süreyi artırınca kısa duraklamalar atlanır. Pay, keserken nefes bırakır.",
     sil_status: "In/Out seçimindeki sessizlikleri tespit et",
-    sec_syscheck: "Sistem Kontrolü", sec_models: "Whisper Modelleri", sec_install: "Kurulum Notları",
+    sec_syscheck: "Sistem Kontrolü (opsiyonel / Pro)", sec_models: "Whisper Modelleri", sec_install: "Kurulum Notları",
+    setup_optional: "✓ Subsper'in yerleşik motoru kutudan çıktığı gibi çalışır — kurulum gerekmez. Aşağıdaki her şey OPSİYONELDİR — yalnızca konuşmacı etiketleri, otomatik noktalama veya alternatif motor istiyorsan Python + bir Pro motor kur.",
+    nm_builtin: "Subsper Yerleşik motor", ds_builtin_ok: "✓ Hazır — gömülü whisper.cpp + ffmpeg, kurulum yok", ds_builtin_dl: "Gömülü — model ilk transcribe'da iner",
+    py_optional: "Algılanmadı — sorun değil. Python'ı yalnızca opsiyonel Pro özellikler (konuşmacı etiketleri vb.) için kur.",
     btn_recheck: "Yeniden Tara", btn_reload: "Eklentiyi Yenile",
     tip_tab_transcribe: "Videodan otomatik altyazı oluştur ve düzenle",
     tip_tab_silence: "Sessiz boşlukları bul, işaretle veya kes",
@@ -615,6 +628,23 @@ function resolvePythonAsync() {
 function extDir()     { return csInterface.getSystemPath(SystemPath.EXTENSION); }
 function scriptsDir() { return path.join(extDir(), "scripts"); }
 
+// Bundled zero-setup engine (whisper.cpp). Loaded lazily, cached. Returns null
+// if unavailable so callers can fall back to the Python engine.
+let _WCPP;
+function wcpp() {
+    if (_WCPP === undefined) {
+        try {
+            _WCPP = _req(path.join(extDir(), "js", "whispercpp.js"));
+            try {
+                _WCPP.setLogger({ file: path.join(path.dirname(_WCPP.modelsDir()), "subsper.log") });
+                _WCPP.dbg("=== Subsper extension start " + new Date().toISOString() + " | " + process.platform + " ===");
+            } catch (e) {}
+        }
+        catch (e) { console.error("[Subsper] whispercpp load failed:", e); _WCPP = null; }
+    }
+    return _WCPP;
+}
+
 // ── Run Python script ─────────────────────────────────────────────────────
 // Augment PATH so spawned tools (python/ffmpeg) are found. On macOS, GUI apps
 // launch without Homebrew dirs in PATH, so prepend them (':' separator). On
@@ -638,7 +668,7 @@ function runPython(scriptName, args, onStderr) {
         const py     = findPython();
         const script = path.join(scriptsDir(), scriptName);
         const proc   = spawn(py, [script, ...args], { env: spawnEnv() });
-        const STDERR_CAP = 8000;
+        const STDERR_CAP = 32000;
         let stdout = "", stderr = "";
         // setEncoding("utf8") decodes correctly even when a multi-byte char is
         // split across chunks (raw .toString() per chunk can corrupt them).
@@ -662,6 +692,15 @@ function runPython(scriptName, args, onStderr) {
 }
 
 function runCmd(cmd, args) {
+    if (process.platform === "darwin" && cmd.includes("python")) {
+        try {
+            const isRosetta = require("child_process").execSync("sysctl -n sysctl.proc_translated 2>/dev/null", {encoding:"utf8"}).trim();
+            if (isRosetta === "1") {
+                args = ["-arm64", cmd, ...args];
+                cmd = "arch";
+            }
+        } catch(e) {}
+    }
     return new Promise(resolve => {
         const proc = spawn(cmd, args);
         let out = "", err = "";
@@ -675,8 +714,19 @@ function runCmd(cmd, args) {
 // ── ExtendScript ──────────────────────────────────────────────────────────
 function loadHostJSX() {
     return new Promise(resolve => {
-        const jsxPath = path.join(extDir(), "jsx", "host.jsx").replace(/\\/g, "/");
-        csInterface.evalScript(`$.evalFile("${jsxPath}")`, () => resolve());
+        const jsxPath = path.join(extDir(), "jsx", "host.jsx");
+        // Read the host source with Node and inject it straight into the
+        // ExtendScript engine. This redefines every function on each call and
+        // is IMMUNE to (a) the ScriptPath "load once per engine" cache and
+        // (b) $.evalFile path quirks on macOS that silently keep stale code.
+        try {
+            const src = fs.readFileSync(jsxPath, "utf8");
+            csInterface.evalScript(src, () => resolve());
+        } catch (e) {
+            // Fallback: evalFile by path if the read ever fails
+            const p = jsxPath.replace(/\\/g, "/");
+            csInterface.evalScript(`$.evalFile("${p}")`, () => resolve());
+        }
     });
 }
 
@@ -829,6 +879,10 @@ function initSettingsUI() {
     set("set-engine", settings.engine);
     chk("set-diarize", settings.diarize);
     chk("set-autopunct", settings.autoPunctuate);
+
+    // Threads
+    set("set-threads", settings.threads);
+    txt("threads-val", settings.threads == 0 ? "Auto" : settings.threads);
 
     // Transcript clean-up
     set("set-dict", settings.customDict);
@@ -1091,6 +1145,7 @@ async function detectSilences() {
     showSilenceProgress(true);
 
     try {
+        await loadHostJSX();
         const seqInfo = await evalScript("getSequenceInfo()");
         if (!seqInfo.success) {
             setSilenceStatus(seqInfo.error || "Error reading timeline", "error");
@@ -1098,7 +1153,7 @@ async function detectSilences() {
             return;
         }
         if (!seqInfo.clips || seqInfo.clips.length === 0) {
-            setSilenceStatus("No clips in In/Out range. Set In/Out over a clip first.", "warning");
+            setSilenceStatus("No audio clips on the timeline. Add a clip first.", "warning");
             return;
         }
 
@@ -1159,9 +1214,10 @@ async function detectSilences() {
 
 // Shared: extract In/Out audio → return detected silence ranges in TIMELINE seconds
 async function findSilenceRanges() {
+    await loadHostJSX();
     const seqInfo = await evalScript("getSequenceInfo()");
     if (!seqInfo.success) throw new Error(seqInfo.error || "Error reading timeline");
-    if (!seqInfo.clips || seqInfo.clips.length === 0) throw new Error("No clips in In/Out range. Set In/Out over a clip first.");
+    if (!seqInfo.clips || seqInfo.clips.length === 0) throw new Error("No audio clips on the timeline. Add a clip first.");
 
     const tmpAudio = path.join(os.tmpdir(), `silence_${Date.now()}.wav`);
     const clipsArg = JSON.stringify({ clips: seqInfo.clips, duration: seqInfo.duration });
@@ -1247,10 +1303,11 @@ async function enhanceAudio() {
     setAudioStatus("Reading timeline for audio enhancement…", "info");
     showAudioProgress(true);
     try {
+        await loadHostJSX();
         const seqInfo = await evalScript("getSequenceInfo()");
         if (!seqInfo.success) { setAudioStatus(seqInfo.error || "Error reading timeline", "error"); return; }
         if (!seqInfo.clips || seqInfo.clips.length === 0) {
-            setAudioStatus("No clips in the In/Out range. Set In/Out over a clip first.", "warning");
+            setAudioStatus("No audio clips on the timeline. Add a clip first.", "warning");
             return;
         }
 
@@ -1772,10 +1829,10 @@ function classifyError(raw) {
         why:  "A sequence (timeline) must be open and active in Premiere.",
         fix:  "Open a sequence in the Timeline panel and try again.",
     };
-    if ((e.includes("in") || e.includes("out")) && e.includes("point")) return {
-        what: "No In/Out points set.",
-        why:  "Transcription requires a selected time range.",
-        fix:  "Press I to set an In point and O to set an Out point on the timeline, then try again.",
+    if (e.includes("timeline is empty")) return {
+        what: "The timeline is empty.",
+        why:  "There are no clips on the active sequence to transcribe.",
+        fix:  "Add a video or audio clip to the timeline, then try again.",
     };
     if (e.includes("source media file not found")) return {
         what: "Source media file is offline.",
@@ -1848,36 +1905,67 @@ async function startTranscription() {
         setStatus("Reading timeline…", "info");
         showProgress(true);
 
+        await loadHostJSX();   // always run the freshest host.jsx (defeats JSX cache)
         const seqInfo = await evalScript("getSequenceInfo()");
         if (!seqInfo.success) { handleError(seqInfo.error); return; }
         if (!seqInfo.clips || seqInfo.clips.length === 0) {
-            handleError("No clips found in the selected In/Out range.\nMake sure your In/Out points overlap a clip on the timeline.");
+            handleError("No audio clips found on the timeline.\nAdd a video/audio clip, then try again.");
             return;
         }
 
-        setStatus(`Extracting audio… (${seqInfo.duration.toFixed(1)}s selected)`, "info");
-
+        const scopeNote = seqInfo.wholeSequence ? "whole timeline" : "In/Out range";
         const tmpAudio = path.join(os.tmpdir(), `whisper_${Date.now()}.wav`);
-        const clipsArg = JSON.stringify({ clips: seqInfo.clips, duration: seqInfo.duration });
 
-        const extractRes = await runPython("extract_audio.py", [clipsArg, tmpAudio]);
-        if (!extractRes.success) { handleError(extractRes.error || "Audio extraction failed."); return; }
+        // Engine routing: bundled whisper.cpp (zero-setup) is the default. Python
+        // (whisperx/mlx/openai) is used only when explicitly chosen or when
+        // diarization (speaker labels) is on — the optional "Pro" path.
+        const wantPython = settings.diarize ||
+                           ["whisperx", "mlx", "openai"].indexOf(settings.engine) !== -1;
+        const W = wantPython ? null : wcpp();
 
-        const engLabel = { whisperx: "WhisperX", mlx: "mlx-whisper", openai: "openai-whisper", auto: "Whisper" }[settings.engine] || "Whisper";
-        setStatus(`Transcribing with ${engLabel}… (first run may download the model)`, "info");
+        let txRes;
+        if (W) {
+            try {
+                setStatus(`Extracting audio… (${seqInfo.duration.toFixed(1)}s — ${scopeNote})`, "info");
+                await W.extractClipsToWav(extDir(),
+                    { clips: seqInfo.clips, duration: seqInfo.duration }, tmpAudio, { env: spawnEnv() });
+                if (!W.modelExists(model)) {
+                    setStatus(`Downloading ${model} model… (one-time)`, "info");
+                    await W.ensureModel(model, (frac, got, total, phase) =>
+                        setStatus(phase ? "Reconnecting… (download resumes automatically)"
+                                        : `Downloading ${model} model… ${Math.round(frac * 100)}%`, "info"));
+                }
+                setStatus("Transcribing (Subsper engine)…", "info");
+                const r = await W.transcribeWav({
+                    appDir: extDir(), wavPath: tmpAudio, modelKey: model, language,
+                    spawnOpts: { env: spawnEnv() },
+                    onLog: s => { const m = /progress\s*=\s*(\d+)\s*%/i.exec(s); if (m) setStatus(`Transcribing… ${m[1]}%`, "info"); },
+                });
+                txRes = { success: true, segments: r.segments, text: r.text, language: r.language, engine: "whisper.cpp", notes: [] };
+            } catch (e) {
+                let msg = (e && e.message) || String(e);
+                try {
+                    const lp = W.logPath && W.logPath(); const lg = W.recentLog && W.recentLog(22);
+                    if (lp) msg += "\n\nFull log: " + lp;
+                    if (lg) msg += "\n\n— last steps —\n" + lg;
+                } catch (_) {}
+                txRes = { success: false, error: msg };
+            }
+        } else {
+            setStatus(`Extracting audio… (${seqInfo.duration.toFixed(1)}s — ${scopeNote})`, "info");
+            const clipsArg = JSON.stringify({ clips: seqInfo.clips, duration: seqInfo.duration });
+            const extractRes = await runPython("extract_audio.py", [clipsArg, tmpAudio]);
+            if (!extractRes.success) { handleError(extractRes.error || "Audio extraction failed."); return; }
 
-        const txArgs = [
-            tmpAudio,
-            model,
-            language,
-            settings.engine,
-            settings.diarize ? "1" : "0",
-        ];
-
-        const txRes = await runPython("transcribe.py", txArgs, stderr => {
-            if (stderr.includes("Downloading") || stderr.includes("download"))
-                setStatus("Downloading model… (one-time, please wait)", "info");
-        });
+            const engLabel = { whisperx: "WhisperX", mlx: "mlx-whisper", openai: "openai-whisper", auto: "Whisper" }[settings.engine] || "Whisper";
+            setStatus(`Transcribing with ${engLabel}… (first run may download the model)`, "info");
+            txRes = await runPython("transcribe.py",
+                [tmpAudio, model, language, settings.engine, settings.diarize ? "1" : "0"],
+                stderr => {
+                    if (stderr.includes("Downloading") || stderr.includes("download"))
+                        setStatus("Downloading model… (one-time, please wait)", "info");
+                });
+        }
 
         try { if (fs.existsSync(tmpAudio)) fs.unlinkSync(tmpAudio); } catch {}
 
@@ -2441,6 +2529,73 @@ function onSendModeChange(val) {
 // ── Setup / Diagnostics ───────────────────────────────────────────────────
 let diagData = null;
 
+// Gate the optional "Pro" engines (Python) by what's actually installed, so the
+// end user can never pick a broken option. Built-in (whisper.cpp) always works.
+function applyEngineAvailability() {
+    const sel = $("set-engine");
+    if (!sel) return;
+    const note = $("engine-pro-note");
+    const ok = (k) => diagData && diagData[k] && diagData[k].status === "ok";
+    const avail = { whisperx: ok("whisperx"), mlx: ok("mlx_whisper"), openai: ok("whisper") };
+
+    ["whisperx", "mlx", "openai"].forEach(v => {
+        const opt = sel.querySelector(`option[value="${v}"]`);
+        if (opt) opt.disabled = !avail[v];
+    });
+    const diar = $("set-diarize");
+    if (diar) {
+        diar.disabled = !avail.whisperx;
+        if (!avail.whisperx && diar.checked) { diar.checked = false; settings.diarize = false; saveSettings(); }
+    }
+    // If a Pro engine is selected but isn't installed, fall back to Built-in.
+    if (["whisperx", "mlx", "openai"].indexOf(settings.engine) !== -1 && !avail[settings.engine]) {
+        settings.engine = "cpp"; saveSettings();
+    }
+    sel.value = settings.engine;
+    if (note) {
+        const anyPro = avail.whisperx || avail.mlx || avail.openai;
+        if (anyPro) { note.style.display = "none"; }
+        else { note.textContent = t("pro_unavailable"); note.style.display = "block"; }
+    }
+}
+
+async function installPackage(pkg, key) {
+    const btn = $(`btn-install-${key}`);
+    if (btn) { btn.textContent = "Installing…"; btn.disabled = true; btn.classList.add("installing"); }
+
+    const py  = findPython();
+    let res = await runCmd(py, ["-m", "pip", "install", "--user", pkg]);
+    
+    // First verification
+    let check = await runCmd(py, [path.join(extDir(), "scripts", "check_setup.py")]);
+    let parsed = {};
+    try { parsed = JSON.parse(check.out); } catch(e) {}
+
+    // If pip succeeded but import still fails (e.g. wrong architecture cached, or corrupt), force reinstall
+    if (res.code === 0 && parsed[key] && parsed[key].status !== "ok") {
+        if (btn) { btn.textContent = "Fixing Corrupted Files…"; }
+        res = await runCmd(py, ["-m", "pip", "install", "--user", "--force-reinstall", "--no-cache-dir", pkg]);
+        check = await runCmd(py, [path.join(extDir(), "scripts", "check_setup.py")]);
+        try { parsed = JSON.parse(check.out); } catch(e) {}
+    }
+
+    if (res.code === 0 && parsed[key] && parsed[key].status === "ok") {
+        if (btn) {
+            btn.textContent = "Installed";
+            btn.classList.remove("installing");
+            btn.classList.add("installed");
+        }
+        await runDiagnostics();
+    } else {
+        if (btn) {
+            btn.textContent = "Install Failed";
+            btn.disabled = false;
+            btn.classList.remove("installing");
+        }
+        alert("Failed to install " + pkg + ".\n\n" + res.err + "\n\nImport check output:\n" + check.out);
+    }
+}
+
 async function runDiagnostics() {
     setupIndicator.className = "setup-indicator loading";
     $("checks-list").innerHTML = `<div class="check-loading">Checking…</div>`;
@@ -2450,19 +2605,44 @@ async function runDiagnostics() {
     diagData = data;
 
     if (!data || data.error) {
-        setupIndicator.className  = "setup-indicator error";
-        setupBadge.style.display  = "inline-flex";
-        $("checks-list").innerHTML = `<div class="check-loading" style="color:var(--red2)">
-          Could not run Python. Is Python 3 installed?</div>`;
+        // No Python — that's fine. The built-in engine needs none. Show it as
+        // ready and frame Python as an optional Pro prerequisite (no scary red).
+        const bi = builtinEngineReady();
+        $("checks-list").innerHTML = `<div class="check-item">
+            <div class="check-icon check-${bi ? "ok" : "warn"}">${icon(bi ? "check" : "alert")}</div>
+            <div class="check-body">
+              <div class="check-name">${t("nm_builtin")}</div>
+              <div class="check-detail ${bi ? "ok" : "warn"}">${bi ? t("ds_builtin_ok") : t("ds_builtin_dl")}</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="check-icon check-opt">${icon("close")}</div>
+            <div class="check-body">
+              <div class="check-name">Python</div>
+              <div class="check-detail opt">${t("py_optional")}</div>
+            </div>
+          </div>`;
+        $("models-list").innerHTML = "";
+        applyEngineAvailability();
+        setupIndicator.className = "setup-indicator ok";  // built-in works regardless
+        setupBadge.style.display = "none";
         return;
     }
 
     renderChecks(data);
     renderModels(data.models);
     renderSetupNotes(data._os || "mac");
+    applyEngineAvailability();
 
     setupIndicator.className = `setup-indicator ${data._ready ? "ok" : "warn"}`;
     setupBadge.style.display = data._ready ? "none" : "inline-flex";
+}
+
+function builtinEngineReady() {
+    const W = wcpp();
+    if (!W) return false;
+    try { return fs.existsSync(W.whisperBin(extDir())) && fs.existsSync(W.ffmpegBin(extDir())); }
+    catch (e) { return false; }
 }
 
 function renderChecks(data) {
@@ -2474,7 +2654,15 @@ function renderChecks(data) {
         { key: "mlx_whisper"},
         { key: "punctuation"},
     ];
-    let html = "";
+    // Built-in engine row first — this is what 99% of users use; needs no setup.
+    const bi = builtinEngineReady();
+    let html = `<div class="check-item">
+      <div class="check-icon check-${bi ? "ok" : "warn"}">${icon(bi ? "check" : "alert")}</div>
+      <div class="check-body">
+        <div class="check-name">${t("nm_builtin")}</div>
+        <div class="check-detail ${bi ? "ok" : "warn"}">${bi ? t("ds_builtin_ok") : t("ds_builtin_dl")}</div>
+      </div>
+    </div>`;
     for (const { key } of keys) {
         const c = data[key]; if (!c) continue;
         const st = c.status;             // ok | warn | missing | na
@@ -2529,19 +2717,37 @@ async function installPackage(pkg, key) {
     if (btn) { btn.textContent = "Installing…"; btn.disabled = true; btn.classList.add("installing"); }
 
     const py  = findPython();
-    const res = await runCmd(py, ["-m", "pip", "install", "--user", pkg]);
+    let res = await runCmd(py, ["-m", "pip", "install", "--user", pkg]);
+    
+    // First verification
+    let check = await runCmd(py, [path.join(extDir(), "scripts", "check_setup.py")]);
+    let parsed = {};
+    try { parsed = JSON.parse(check.out); } catch(e) {}
 
-    if (res.code === 0) {
-        showToast(`${pkg} installed successfully!`, "success");
-    } else {
-        showToast(`Install failed: ${res.err.slice(0, 120)}`, "error", 6000);
+    // If pip succeeded but import still fails (e.g. wrong architecture cached, or corrupt), force clean and reinstall
+    if (res.code === 0 && parsed[key] && parsed[key].status !== "ok") {
+        if (btn) { btn.textContent = "Fixing Corrupted Files…"; }
+        await runCmd(py, ["-c", "import site, shutil; site_dir = site.getusersitepackages(); shutil.rmtree(site_dir, ignore_errors=True)"]);
+        res = await runCmd(py, ["-m", "pip", "install", "--user", "--no-cache-dir", pkg]);
+        check = await runCmd(py, [path.join(extDir(), "scripts", "check_setup.py")]);
+        try { parsed = JSON.parse(check.out); } catch(e) {}
+    }
+
+    if (res.code === 0 && parsed[key] && parsed[key].status === "ok") {
         if (btn) {
-            btn.textContent = diagData?.[key]?.fix_label || "Install automatically";
-            btn.disabled    = false;
+            btn.textContent = "Installed";
+            btn.classList.remove("installing");
+            btn.classList.add("installed");
+        }
+        await runDiagnostics();
+    } else {
+        if (btn) {
+            btn.textContent = "Install Failed";
+            btn.disabled = false;
             btn.classList.remove("installing");
         }
+        alert("Failed to install " + pkg + ".\n\n" + res.err + "\n\nImport check output:\n" + check.out);
     }
-    await runDiagnostics();
 }
 
 function renderModels(models) {
@@ -2638,10 +2844,9 @@ function initTooltips() {
 (function init() {
     loadHostJSX();
 
-    applyTheme();
     applyLanguage();
     applyIcons();
-    applyTheme();   // refresh theme-btn icon now that icon() output is in place
+    applyTheme();   // apply after icons so theme-btn icon renders correctly
     renderSegments();
     initTooltips();
     const lseg = $("lang-seg");
@@ -2664,14 +2869,16 @@ function initTooltips() {
     // never blocks the UI), then run the diagnostic.
     resolvePythonAsync().then(() => runPython("check_setup.py", [])).then(data => {
         diagData = data;
+        applyEngineAvailability();
         if (!data || !data._ready) {
-            setupIndicator.className = "setup-indicator warn";
-            setupBadge.style.display = "inline-flex";
+            // Built-in engine works regardless — Setup is only for optional Pro.
+            setupIndicator.className = "setup-indicator ok";
         } else {
             setupIndicator.className = "setup-indicator ok";
         }
     }).catch(() => {
-        setupIndicator.className = "setup-indicator error";
-        setupBadge.style.display = "inline-flex";
+        diagData = null;
+        applyEngineAvailability();
+        setupIndicator.className = "setup-indicator ok";
     });
 })();
