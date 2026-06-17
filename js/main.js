@@ -18,7 +18,6 @@ let lastLanguage = "";
 const DEFAULT_SETTINGS = {
     engine:          "cpp",       // bundled whisper.cpp — zero setup. Pro: whisperx/mlx/openai (Python)
     diarize:         false,
-    autoPunctuate:   false,
     autoSplit:       true,
     maxCharsPerLine: 42,
     maxLines:        2,
@@ -144,7 +143,6 @@ const I18N = {
     opt_eng_mlx: "Pro: mlx-whisper — Apple Silicon (needs Python)", opt_eng_openai: "Pro: openai-whisper (needs Python)",
     pro_unavailable: "Pro engines need Python + WhisperX (optional). Built-in is selected.",
     nm_diar: "Speaker Labels (Pro)", ds_diar: "Tags who is speaking. Needs the WhisperX Pro engine + a free HuggingFace token.",
-    nm_autopunct: "Auto-punctuation", ds_autopunct: "Restore punctuation & casing right after transcribing",
     nm_autocleanup: "Auto clean-up", ds_autocleanup: "Apply dictionary & remove fillers when transcription finishes",
     lbl_dict: "Custom dictionary", hint_dict: "Fixes names, brands & mis-hearings. Format: wrong=right (whole word, case-insensitive).",
     nm_filler: "Filler words", ds_filler: "Include the built-in list (ee, ıı, şey, um, uh…)",
@@ -199,7 +197,7 @@ const I18N = {
     tip_replaceinput: "Text to replace the match with. Leave empty to delete the word",
     tip_replaceall: "Replace all matches",
     tip_segcount: "Total number of segments (subtitle lines)",
-    tip_find: "Find & replace text", tip_punct: "Auto-fix punctuation & capitalization",
+    tip_find: "Find & replace text",
     tip_clean: "Clean-up menu: dictionary, fillers, profanity filter",
     tip_clean_dict: "Apply your wrong=right rules from Settings",
     tip_clean_filler: "Remove filler words (ee, ıı, şey, um, uh…)",
@@ -214,7 +212,6 @@ const I18N = {
     tip_send: "Send the subtitle to the Premiere timeline as a caption track",
     tip_engine: "Which AI engine transcribes. WhisperX = word-level timing + speaker labels (needed for karaoke). mlx = fastest on Apple Silicon. openai = most compatible.",
     tip_diar: "Labels who is speaking (Speaker 1, 2…). WhisperX only. Needs a free HuggingFace token.",
-    tip_autopunct: "Auto-fixes punctuation & capitalization right after transcribing",
     tip_autocleanup: "After transcribing, applies dictionary rules and removes filler words automatically",
     tip_filler: "Use the built-in filler list (ee, ıı, şey, yani, um, uh…)",
     tip_profmode: "How to hide profanity: first letter + asterisks (s***) or remove (—)",
@@ -300,7 +297,6 @@ const I18N = {
     opt_eng_mlx: "Pro: mlx-whisper — Apple Silicon (Python gerekir)", opt_eng_openai: "Pro: openai-whisper (Python gerekir)",
     pro_unavailable: "Pro motorlar Python + WhisperX ister (opsiyonel). Yerleşik motor seçildi.",
     nm_diar: "Konuşmacı Etiketleri (Pro)", ds_diar: "Kim konuşuyor etiketler. WhisperX Pro motoru + ücretsiz HuggingFace token gerekir.",
-    nm_autopunct: "Otomatik noktalama", ds_autopunct: "Transkripsiyon biter bitmez noktalama ve büyük harfleri düzeltir",
     nm_autocleanup: "Otomatik temizlik", ds_autocleanup: "İş bitince sözlüğü uygular ve dolgu kelimeleri siler",
     lbl_dict: "Özel sözlük", hint_dict: "İsim/marka/yanlış duymaları düzeltir. Format: yanlış=doğru (tam kelime, büyük-küçük fark etmez).",
     nm_filler: "Dolgu kelimeler", ds_filler: "Yerleşik listeyi kullan (ee, ıı, şey, um, uh…)",
@@ -352,7 +348,7 @@ const I18N = {
     tip_replaceinput: "Bulunan kelimenin yerine yazılacak metin. Boş bırakırsan kelimeyi siler",
     tip_replaceall: "Bulunan tüm eşleşmeleri değiştir",
     tip_segcount: "Toplam segment (altyazı satırı) sayısı",
-    tip_find: "Metin içinde ara ve değiştir", tip_punct: "Noktalama ve büyük harfleri otomatik düzelt",
+    tip_find: "Metin içinde ara ve değiştir",
     tip_clean: "Temizlik menüsü: sözlük, dolgu kelimeler, küfür filtresi",
     tip_clean_dict: "Ayarlardaki yanlış=doğru kurallarını uygula",
     tip_clean_filler: "Dolgu kelimeleri sil (ee, ıı, şey, um, uh…)",
@@ -367,7 +363,6 @@ const I18N = {
     tip_send: "Altyazıyı Premiere zaman çizelgesine caption track olarak gönder",
     tip_engine: "Hangi yapay zekâ motoru yazıya döksün. WhisperX = kelime kelime zaman + konuşmacı (karaoke için gerekli). mlx = Apple Silicon'da en hızlı. openai = en uyumlu.",
     tip_diar: "Kim konuşuyor diye etiketler (Konuşmacı 1, 2…). Sadece WhisperX. Ücretsiz HuggingFace token gerektirir.",
-    tip_autopunct: "Transkripsiyon biter bitmez noktalama ve büyük harfleri otomatik düzeltir",
     tip_autocleanup: "Transkripsiyon bitince sözlük kurallarını uygular ve dolgu kelimeleri otomatik siler",
     tip_filler: "Yerleşik dolgu kelime listesini kullan (ee, ıı, şey, yani, um, uh…)",
     tip_profmode: "Küfür nasıl gizlensin: ilk harf + yıldız (s***) ya da tamamen kaldır (—)",
@@ -893,7 +888,6 @@ function initSettingsUI() {
     set("set-theme", settings.theme);
     set("set-engine", settings.engine);
     chk("set-diarize", settings.diarize);
-    chk("set-autopunct", settings.autoPunctuate);
 
     // Threads
     set("set-threads", settings.threads);
@@ -1385,68 +1379,6 @@ async function applyAutoZoom() {
         showEditProgress(false);
         if (btn) btn.disabled = false;
     }
-}
-
-// ── Punctuation restore ───────────────────────────────────────────────────
-// opts.silent  → don't show the "not installed" error panel (used by auto mode)
-// opts.auto    → called automatically right after transcription
-async function fixPunctuation(opts) {
-    opts = opts || {};
-    if (segments.length === 0) {
-        if (!opts.silent) showToast("Nothing to fix yet", "info", 2000);
-        return;
-    }
-    const btn = $("punct-btn");
-    if (btn) { btn.disabled = true; btn.classList.add("busy"); }
-    setStatus(opts.auto ? "Auto-punctuating…" : "Restoring punctuation… (first run downloads the model)", "info");
-    showProgress(true);
-
-    let res;
-    try {
-        const payload = JSON.stringify({
-            segments: segments.map(s => ({ text: s.text })),
-            language: (lastLanguage || "auto"),
-        });
-        res = await runPython("punctuate.py", [payload]);
-    } catch (e) {
-        res = { success: false, error: e && e.message ? e.message : String(e) };
-    }
-
-    showProgress(false);
-    if (btn) { btn.disabled = false; btn.classList.remove("busy"); }
-
-    if (!res || !res.success || !Array.isArray(res.segments)) {
-        const err = (res && res.error) || "Punctuation restore failed";
-        if (err.includes("not installed") || err.includes("No module")) {
-            setStatus("Punctuation model not installed", "warning");
-            if (!opts.silent) {
-                showError(
-                    "Punctuation restore is not installed.",
-                    "It uses the free offline 'deepmultilingualpunctuation' model.",
-                    "Install it from the Setup tab, then try again.",
-                    "Go to Setup", () => switchTab("setup")
-                );
-            } else {
-                showToast("Auto-punctuate skipped — model not installed (Setup tab)", "info", 5000);
-            }
-        } else {
-            if (!opts.silent) handleError(err);
-            else showToast("Auto-punctuate failed: " + err.split("\n")[0], "warning", 5000);
-        }
-        return;
-    }
-
-    let changed = 0;
-    res.segments.forEach((s, i) => {
-        if (segments[i] && s && typeof s.text === "string" && s.text !== segments[i].text) {
-            segments[i].text = s.text;
-            changed++;
-        }
-    });
-    renderSegments();
-    if (selectedIndex >= 0) selectSegment(selectedIndex);
-    setStatus(`Punctuation restored — ${changed} segment(s) updated`, "success");
-    if (!opts.silent || changed > 0) showToast(`Punctuation fixed (${changed} updated)`, "success");
 }
 
 // ── Transcript clean-up (dictionary · fillers · profanity) ────────────────
@@ -2036,11 +1968,6 @@ async function startTranscription() {
             // Diarization requested but produced no speakers → tell the user why
             if (settings.diarize && !segments.some(s => s.speaker)) {
                 showToast("Speaker labels need a HuggingFace token (see Settings). Transcribed without them.", "info", 6000);
-            }
-
-            // Auto-punctuation (runs after transcription if enabled)
-            if (settings.autoPunctuate) {
-                await fixPunctuation({ silent: true, auto: true });
             }
 
             // Auto clean-up: dictionary + filler removal (profanity left manual)
@@ -2664,10 +2591,7 @@ function renderChecks(data) {
     const keys = [
         { key: "python"     },
         { key: "ffmpeg"     },
-        { key: "whisper"    },   // openai-whisper — the reliable baseline engine
-        { key: "whisperx"   },   // optional, advanced
-        { key: "mlx_whisper"},
-        { key: "punctuation"},
+        { key: "whisperx"   },   // optional Pro — speaker labels
     ];
     // Built-in engine row first — this is what 99% of users use; needs no setup.
     const bi = builtinEngineReady();

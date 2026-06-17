@@ -126,18 +126,6 @@ def check():
                 "fix_cmd": pip_cmd("mlx-whisper"), "fix_label": "Install automatically",
             }
 
-    # punctuation (optional)
-    try:
-        import deepmultilingualpunctuation  # noqa: F401
-        out["punctuation"] = {"status": "ok", "label": "Punctuation restore (optional)",
-                              "optional": True, "detail": "Installed"}
-    except Exception:
-        out["punctuation"] = {
-            "status": "missing", "label": "Punctuation restore (optional)", "optional": True,
-            "detail": "Restores punctuation & casing — not required",
-            "fix_type": "pip", "fix_pkg": "deepmultilingualpunctuation",
-            "fix_cmd": pip_cmd("deepmultilingualpunctuation"), "fix_label": "Install automatically",
-        }
 
     # cached whisper models (~/.cache/whisper on all platforms)
     cached = []

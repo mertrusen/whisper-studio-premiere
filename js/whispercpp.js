@@ -61,11 +61,37 @@ function exeName(base) {
     return process.platform === "win32" ? base + ".exe" : base;
 }
 
-/* Find a bundled binary under <appDir>/bin/<plat>/<name>, else fall back to a
- * system copy (known absolute paths, then bare name for PATH resolution). */
+// Where the installed Subsper DESKTOP app keeps its bundled engine. The Premiere
+// extension reuses it, so installing the desktop app makes the extension work
+// too — no terminal, no separate engine install.
+function _desktopAppBins(name) {
+    const exe = exeName(name);
+    const rel = path.join("bin", platKey(), exe);
+    if (process.platform === "darwin") {
+        return [
+            path.join("/Applications/Subsper.app/Contents/Resources", rel),
+            path.join(os.homedir(), "Applications/Subsper.app/Contents/Resources", rel),
+        ];
+    }
+    if (process.platform === "win32") {
+        const la = process.env.LOCALAPPDATA || "";
+        const pf = process.env.PROGRAMFILES || "C:\\Program Files";
+        return [
+            path.join(la, "Programs", "Subsper", "resources", rel),
+            path.join(pf, "Subsper", "resources", rel),
+        ];
+    }
+    return [];
+}
+
+/* Find a binary: bundled under <appDir>/bin/<plat>/, else the installed Subsper
+ * desktop app's bundled copy, else a system copy, else rely on PATH. */
 function resolveBin(appDir, name, systemCandidates) {
     const bundled = path.join(appDir, "bin", platKey(), exeName(name));
     if (safeExists(bundled)) return bundled;
+    for (const c of _desktopAppBins(name)) {
+        if (safeExists(c)) return c;
+    }
     for (const c of (systemCandidates || [])) {
         if (safeExists(c)) return c;
     }

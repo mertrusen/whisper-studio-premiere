@@ -168,7 +168,6 @@
     <div class="actions-bar" id="actions-bar" style="display:none">
       <span class="seg-count" id="seg-count" data-i18n-tip="tip_segcount"></span>
       <button class="btn-secondary" onclick="toggleFindReplace()" data-i18n-tip="tip_find"><span class="ic" data-icon="search"></span></button>
-      <button class="btn-secondary" id="punct-btn" onclick="fixPunctuation()" data-i18n-tip="tip_punct"><span class="ic" data-icon="pilcrow"></span></button>
       <div class="export-wrap">
         <button class="btn-secondary" onclick="toggleCleanMenu()" data-i18n-tip="tip_clean"><span class="ic" data-icon="sparkles"></span></button>
         <div class="export-menu" id="clean-menu" style="display:none">
@@ -308,16 +307,6 @@
           </div>
           <label class="toggle" data-i18n-tip="tip_diar">
             <input type="checkbox" id="set-diarize" onchange="onSettingChange('diarize', this.checked)">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="setting-row" style="margin-top:10px">
-          <div class="setting-info">
-            <div class="setting-name" data-i18n="nm_autopunct">Auto-punctuation</div>
-            <div class="setting-desc" data-i18n="ds_autopunct">Restore punctuation &amp; casing right after transcribing</div>
-          </div>
-          <label class="toggle" data-i18n-tip="tip_autopunct">
-            <input type="checkbox" id="set-autopunct" onchange="onSettingChange('autoPunctuate', this.checked)">
             <span class="toggle-track"></span>
           </label>
         </div>
