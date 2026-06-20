@@ -3054,8 +3054,10 @@ function initTooltips() {
     if (!IS_DESKTOP()) {
         setInterval(async () => {
             if (!segments || segments.length === 0 || isRunning) return;
-            const res = await evalScript("app.project.activeSequence ? app.project.activeSequence.getPlayerPosition().seconds : -1");
-            const t = parseFloat(res);
+            // Robust playhead read: getPlayerPosition().seconds is undefined on
+            // some Premiere builds → use ticks (254016000000 ticks/sec).
+            const res = await evalScript("(function(){try{var s=app.project.activeSequence;if(!s)return -1;var p=s.getPlayerPosition();if(!p)return -1;if(p.ticks!==undefined&&p.ticks!==null&&p.ticks!=='')return parseInt(p.ticks)/254016000000;if(typeof p.seconds==='number')return p.seconds;return -1;}catch(e){return -1;}})()");
+            const t = (typeof res === "number") ? res : parseFloat(res);
             if (isNaN(t) || t < 0) return;
             
             let activeIdx = -1;

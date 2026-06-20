@@ -14,7 +14,7 @@
       <div class="brand-text">
         <span class="brand-title">Sub<span>sper</span></span>
         <span class="brand-tagline" data-i18n="tagline">AI Subtitles</span>
-        <span class="brand-version" style="font-size: 10px; color: var(--text3); margin-left: 6px; font-weight: 500;">v1.6.8</span>
+        <span class="brand-version" style="font-size: 10px; color: var(--text3); margin-left: 6px; font-weight: 500;">v1.6.9</span>
       </div>
     </div>
     <div class="header-right">
@@ -90,6 +90,9 @@
           <span class="ic" data-icon="folder"></span><span data-i18n="btn_loadsrt">Load SRT</span>
         </button>
       </div>
+      <button class="btn-playpause" id="playpause-btn" onclick="playPause()" style="width:100%; justify-content:center" data-i18n-tip="tip_play">
+        <span class="ic" data-icon="play"></span><span data-i18n="btn_play">Play</span>
+      </button>
       <input type="file" id="srt-file-input" accept=".srt" style="display:none">
     </div>
 
