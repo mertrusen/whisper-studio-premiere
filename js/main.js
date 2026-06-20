@@ -35,18 +35,20 @@ const DEFAULT_SETTINGS = {
     uiLang:           "en",       // interface language: en | tr
     theme:            "dark",     // dark | light | auto
     // ── Transcript clean-up ──
+    punctAllowed:    ".,?!:;\"'()[]{}-", // which punctuation to keep
     customDict:      "",          // one "wrong=right" rule per line
+    promptWords:     "",          // comma-separated context words sent as initial_prompt
     autoCleanup:     false,       // apply dictionary + fillers automatically after transcribe
     fillerWords:     "",          // extra fillers (comma/newline separated); blank = built-in only
     fillerOn:        true,        // include built-in filler list
     profanityList:   "",          // extra profanity words
-    profanityMode:   "asterisk",  // asterisk | remove
+    profanityMode:   "remove",    // remove | asterisk
+    // ── AI & API ──
+    geminiApiKey:    "",          // Google Gemini API Key
+    geminiModel:     "gemini-3.5-flash", // Default Gemini model
     // ── Audio enhancement ──
     audioDenoise:    true,
     audioNormalize:  true,
-    // ── Send to Premiere ──
-    sendMode:        "caption",   // caption (SRT track) | graphics (MOGRT text)
-    mogrtPath:       "",          // chosen .mogrt template for styled graphics
     // ── Edit automation ──
     zoomAmount:      8,           // % push-in per clip
     zoomStyle:       "alternate", // alternate | in
@@ -145,6 +147,14 @@ const I18N = {
     nm_diar: "Speaker Labels (Pro)", ds_diar: "Tags who is speaking. Needs the WhisperX Pro engine + a free HuggingFace token.",
     nm_autocleanup: "Auto clean-up", ds_autocleanup: "Apply dictionary & remove fillers when transcription finishes",
     lbl_dict: "Custom dictionary", hint_dict: "Fixes names, brands & mis-hearings. Format: wrong=right (whole word, case-insensitive).",
+    lbl_punct_filter: "Allowed Punctuation", hint_punct_filter: "Only these punctuation marks will be kept. Delete all to remove all punctuation.",
+    lbl_prompt_words: "Context words (AI prompt)", hint_prompt_words: "Difficult words/names that the AI might mis-hear. These are sent as a prompt to improve accuracy. Comma-separated.",
+    sync_title: "Sync with Correct Text", sync_ph: "Paste the fully corrected text here. This will replace words in subtitles while keeping the timing intact.",
+    sync_hint: "Word alignment algorithm will modify the current segments.", tip_sync: "Sync with correct text", btn_sync: "Sync",
+    sec_api: "AI & API", nm_gemini_api: "Gemini API Key", ds_gemini_api: "Get a free key from Google AI Studio to use AI tools.",
+    lbl_ai_tools: "AI Studio", tip_ai: "AI Video Tools",
+    ai_summary: "Summary & Title", ai_shorts: "Extract Shorts", ai_broll: "B-Roll Ideas",
+    ai_ph: "Generated insights will appear here...",
     nm_filler: "Filler words", ds_filler: "Include the built-in list (ee, ıı, şey, um, uh…)",
     lbl_extrafiller: "Extra fillers to remove",
     nm_prof: "Profanity filter", ds_prof: "How to handle matched words",
@@ -174,9 +184,10 @@ const I18N = {
     sil_status: "Detect silences in your In/Out selection",
     // setup
     sec_syscheck: "System Check (optional / Pro)", sec_models: "Whisper Models", sec_install: "Install Notes",
-    setup_optional: "✓ Subsper's built-in engine works out of the box — no setup needed. Everything below is OPTIONAL — install Python + a Pro engine only if you want speaker labels, auto-punctuation, or an alternative engine.",
+    setup_optional: "✓ Subsper's built-in engine works out of the box — no setup needed. Everything below is OPTIONAL — install Python + WhisperX only if you want speaker labels.",
     nm_builtin: "Subsper Built-in engine", ds_builtin_ok: "✓ Ready — bundled whisper.cpp + ffmpeg, no setup", ds_builtin_dl: "Bundled — the model downloads on first transcription",
     py_optional: "Not detected — that's fine. Install Python only for optional Pro features (speaker labels, etc.).",
+    opt_alt_note: "Optional alternative engine — the Built-in engine already covers this. No need to install.",
     btn_recheck: "Re-check", btn_reload: "Reload Extension",
     // tooltips
     tip_tab_transcribe: "Auto-generate and edit subtitles from your video",
@@ -239,18 +250,6 @@ const I18N = {
     tip_uilang: "Interface & tooltip language",
     tip_seek: "Jump here and play", tip_edit: "Edit text (double-click also works)",
     tip_split: "Split this segment in half", tip_del: "Delete this segment",
-    // send-to-Premiere mode
-    sec_send: "Send to Premiere", nm_sendmode: "Send subtitles as",
-    ds_sendmode: "Caption track = simple, fast. Styled graphics = editable text clips with your style (like AutoCut/FireCut).",
-    opt_caption: "Caption track (SRT)", opt_graphics: "Styled graphics (MOGRT)",
-    lbl_mogrt: "Style template (.mogrt)", btn_pickmogrt: "Choose .mogrt…",
-    mogrt_none: "No template chosen", act_send_gfx: "Send as Graphics",
-    hint_mogrt: "Export a styled text template once from Premiere: Graphics workspace → make a text layer → Export Motion Graphics Template. Then pick it here.",
-    tip_sendmode: "How captions land in Premiere: a plain caption track, or editable styled text graphics via a Motion Graphics Template",
-    tip_pickmogrt: "Pick the .mogrt template whose style the subtitles will use",
-    err_nomogrt_what: "No .mogrt template selected.",
-    err_nomogrt_why: "Styled graphics mode places each subtitle using a Motion Graphics Template — you need to pick one first.",
-    err_nomogrt_fix: "Export a styled text template from Premiere (Graphics → text layer → Export Motion Graphics Template), then choose it in Settings.",
     // new tabs
     tab_edit: "Edit", tab_audio: "Audio", sub_actions: "Tools",
     tip_tab_edit: "Automated editing — cut silences, fillers, shorten pauses, auto-zoom",
@@ -299,6 +298,14 @@ const I18N = {
     nm_diar: "Konuşmacı Etiketleri (Pro)", ds_diar: "Kim konuşuyor etiketler. WhisperX Pro motoru + ücretsiz HuggingFace token gerekir.",
     nm_autocleanup: "Otomatik temizlik", ds_autocleanup: "İş bitince sözlüğü uygular ve dolgu kelimeleri siler",
     lbl_dict: "Özel sözlük", hint_dict: "İsim/marka/yanlış duymaları düzeltir. Format: yanlış=doğru (tam kelime, büyük-küçük fark etmez).",
+    lbl_punct_filter: "İzin Verilen Noktalama", hint_punct_filter: "Sadece bu işaretler korunur (örn. sadece soru işareti için '?' yazın). Hepsini silerseniz tüm noktalamalar kalkar.",
+    lbl_prompt_words: "Bağlam kelimeleri (AI prompt)", hint_prompt_words: "Yapay zekanın yanlış duyabileceği zor kelimeler/isimler. Doğruluğu artırmak için prompt olarak gönderilir. Virgülle ayırın.",
+    sync_title: "Doğru Metin ile Eşleştir", sync_ph: "Tamamen düzeltilmiş doğru metni buraya yapıştırın. Zamanlamaları bozmadan altyazıdaki kelimeleri değiştirecektir.",
+    sync_hint: "Kelime eşleştirme algoritması mevcut segmentleri düzenler.", tip_sync: "Doğru metin ile eşleştir", btn_sync: "Eşleştir",
+    sec_api: "Yapay Zeka & API", nm_gemini_api: "Gemini API Anahtarı", ds_gemini_api: "Google AI Studio'dan ücretsiz alacağınız anahtarla çalışır.",
+    lbl_ai_tools: "AI Studio", tip_ai: "Yapay Zeka Araçları",
+    ai_summary: "Özet & Başlık", ai_shorts: "Shorts Çıkar", ai_broll: "B-Roll Fikirleri",
+    ai_ph: "Üretilen fikirler burada görünecek...",
     nm_filler: "Dolgu kelimeler", ds_filler: "Yerleşik listeyi kullan (ee, ıı, şey, um, uh…)",
     lbl_extrafiller: "Kaldırılacak ekstra dolgular",
     nm_prof: "Küfür filtresi", ds_prof: "Eşleşen kelimeler nasıl gizlensin",
@@ -326,9 +333,10 @@ const I18N = {
     hint_sil: "Düşük dB = sadece derin sessizlikler. Süreyi artırınca kısa duraklamalar atlanır. Pay, keserken nefes bırakır.",
     sil_status: "In/Out seçimindeki sessizlikleri tespit et",
     sec_syscheck: "Sistem Kontrolü (opsiyonel / Pro)", sec_models: "Whisper Modelleri", sec_install: "Kurulum Notları",
-    setup_optional: "✓ Subsper'in yerleşik motoru kutudan çıktığı gibi çalışır — kurulum gerekmez. Aşağıdaki her şey OPSİYONELDİR — yalnızca konuşmacı etiketleri, otomatik noktalama veya alternatif motor istiyorsan Python + bir Pro motor kur.",
+    setup_optional: "✓ Subsper'in yerleşik motoru kutudan çıktığı gibi çalışır — kurulum gerekmez. Aşağıdaki her şey OPSİYONELDİR — yalnızca konuşmacı etiketleri istiyorsan Python + WhisperX kur.",
     nm_builtin: "Subsper Yerleşik motor", ds_builtin_ok: "✓ Hazır — gömülü whisper.cpp + ffmpeg, kurulum yok", ds_builtin_dl: "Gömülü — model ilk transcribe'da iner",
     py_optional: "Algılanmadı — sorun değil. Python'ı yalnızca opsiyonel Pro özellikler (konuşmacı etiketleri vb.) için kur.",
+    opt_alt_note: "Opsiyonel alternatif motor — Yerleşik motor bunu zaten karşılıyor. Kurmana gerek yok.",
     btn_recheck: "Yeniden Tara", btn_reload: "Eklentiyi Yenile",
     tip_tab_transcribe: "Videodan otomatik altyazı oluştur ve düzenle",
     tip_tab_silence: "Sessiz boşlukları bul, işaretle veya kes",
@@ -390,17 +398,6 @@ const I18N = {
     tip_uilang: "Arayüz ve tooltip dili",
     tip_seek: "Bu ana git ve oynat", tip_edit: "Metni düzenle (çift tıklama da olur)",
     tip_split: "Bu segmenti ortadan ikiye böl", tip_del: "Bu segmenti sil",
-    sec_send: "Premiere'e Gönderme", nm_sendmode: "Altyazıyı şu şekilde gönder",
-    ds_sendmode: "Caption track = basit, hızlı. Stilli grafik = senin stilinle düzenlenebilir metin klipleri (AutoCut/FireCut gibi).",
-    opt_caption: "Caption track (SRT)", opt_graphics: "Stilli grafik (MOGRT)",
-    lbl_mogrt: "Stil şablonu (.mogrt)", btn_pickmogrt: ".mogrt seç…",
-    mogrt_none: "Şablon seçilmedi", act_send_gfx: "Grafik Olarak Gönder",
-    hint_mogrt: "Premiere'den bir kez stilli metin şablonu çıkar: Graphics çalışma alanı → bir metin katmanı yap → Export Motion Graphics Template. Sonra buradan seç.",
-    tip_sendmode: "Altyazılar Premiere'e nasıl gelsin: düz caption track mi, yoksa MOGRT ile düzenlenebilir stilli metin grafiği mi",
-    tip_pickmogrt: "Altyazıların kullanacağı stildeki .mogrt şablonunu seç",
-    err_nomogrt_what: "Hiç .mogrt şablonu seçilmedi.",
-    err_nomogrt_why: "Stilli grafik modu her altyazıyı bir Motion Graphics Template ile yerleştirir — önce bir tane seçmen gerekir.",
-    err_nomogrt_fix: "Premiere'den stilli bir metin şablonu çıkar (Graphics → metin katmanı → Export Motion Graphics Template), sonra Ayarlar'dan seç.",
     tab_edit: "Düzen", tab_audio: "Ses", sub_actions: "İşlemler",
     tip_tab_edit: "Otomatik kurgu — sessizlik/dolgu kes, duraklama kısalt, oto-zoom",
     tip_tab_audio: "Ses araçları — temizle, dengele, küfür bip'le",
@@ -663,7 +660,7 @@ function wcpp() {
 // the root cause of "Could not run Python" on Windows).
 function spawnEnv() {
     // Force Python to emit UTF-8 on stdout — otherwise on Windows it uses the
-    // locale codepage (e.g. cp1254) and Turkish/Unicode text comes back as � .
+    // locale codepage (e.g. cp1254) and Turkish/Unicode text comes back as  .
     const utf8 = { PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" };
     if (IS_WIN) return Object.assign({}, process.env, utf8);
     const extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin";
@@ -673,11 +670,36 @@ function spawnEnv() {
     });
 }
 
+// macOS Rosetta: when this app runs translated (x64) on Apple Silicon, a child
+// Python would also launch x64 and FAIL to import arm64-installed packages
+// (torch etc.) — the exact reason "punctuation installed but won't run". Wrap
+// python with `arch -arm64` so it runs natively and matches the packages that
+// installPackage/ensurePyPackage installed. Cached.
+let _rosetta;
+function isRosetta() {
+    if (_rosetta === undefined) {
+        _rosetta = false;
+        try {
+            if (process.platform === "darwin")
+                _rosetta = require("child_process")
+                    .execSync("sysctl -n sysctl.proc_translated 2>/dev/null", { encoding: "utf8" })
+                    .trim() === "1";
+        } catch (e) { _rosetta = false; }
+    }
+    return _rosetta;
+}
+function archWrap(cmd, args) {
+    if (process.platform === "darwin" && /python/.test(cmd) && isRosetta())
+        return { cmd: "arch", args: ["-arm64", cmd, ...args] };
+    return { cmd, args };
+}
+
 function runPython(scriptName, args, onStderr) {
     return new Promise(resolve => {
         const py     = findPython();
         const script = path.join(scriptsDir(), scriptName);
-        const proc   = spawn(py, [script, ...args], { env: spawnEnv() });
+        const w      = archWrap(py, [script, ...args]);
+        const proc   = spawn(w.cmd, w.args, { env: spawnEnv() });
         const STDERR_CAP = 32000;
         let stdout = "", stderr = "";
         // setEncoding("utf8") decodes correctly even when a multi-byte char is
@@ -702,15 +724,8 @@ function runPython(scriptName, args, onStderr) {
 }
 
 function runCmd(cmd, args) {
-    if (process.platform === "darwin" && cmd.includes("python")) {
-        try {
-            const isRosetta = require("child_process").execSync("sysctl -n sysctl.proc_translated 2>/dev/null", {encoding:"utf8"}).trim();
-            if (isRosetta === "1") {
-                args = ["-arm64", cmd, ...args];
-                cmd = "arch";
-            }
-        } catch(e) {}
-    }
+    const w = archWrap(cmd, args);
+    cmd = w.cmd; args = w.args;
     return new Promise(resolve => {
         const proc = spawn(cmd, args, { env: spawnEnv() });
         let out = "", err = "";
@@ -719,6 +734,16 @@ function runCmd(cmd, args) {
         proc.on("close", code => resolve({ code, out, err }));
         proc.on("error", e    => resolve({ code: 1, out: "", err: e.message }));
     });
+}
+
+// Auto-install a Python package on first feature use (like the model downloads
+// itself). Returns true on success. --user so no sudo needed. runCmd handles the
+// Rosetta arch wrap so the install matches the interpreter that imports it.
+async function ensurePyPackage(pipName) {
+    const py = findPython();
+    if (!py) return false;
+    const res = await runCmd(py, ["-m", "pip", "install", "--user", pipName]);
+    return res.code === 0;
 }
 
 // ── ExtendScript ──────────────────────────────────────────────────────────
@@ -894,17 +919,26 @@ function initSettingsUI() {
     txt("threads-val", settings.threads == 0 ? "Auto" : settings.threads);
 
     // Transcript clean-up
+    set("set-punct-allowed", settings.punctAllowed !== undefined ? settings.punctAllowed : ".,?!:;\"'()[]{}-");
     set("set-dict", settings.customDict);
+    set("set-prompt-words", settings.promptWords || "");
+    updateDictCount();
     chk("set-autocleanup", settings.autoCleanup);
     chk("set-filleron", settings.fillerOn);
     set("set-fillers", settings.fillerWords);
-    set("set-profanity", settings.profanityList);
-    set("set-profmode", settings.profanityMode);
+    set("set-prof-list", settings.profanityList);
+    set("set-prof-mode", settings.profanityMode);
 
-    // Send to Premiere
-    set("set-sendmode", settings.sendMode);
-    const gsub = $("graphics-sub"); if (gsub) gsub.style.display = settings.sendMode === "graphics" ? "block" : "none";
-    updateMogrtLabel();
+    // AI & API
+    set("set-ai-provider", settings.aiProvider || "gemini");
+    set("set-gemini-key", settings.geminiApiKey || "");
+    set("set-openai-key", settings.openaiApiKey || "");
+    set("set-anthropic-key", settings.anthropicApiKey || "");
+    set("set-custom-url", settings.customApiUrl || "");
+    set("set-custom-key", settings.customApiKey || "");
+    set("set-gemini-model", settings.geminiModel || "gemini-3.5-flash");
+    set("ai-panel-model", settings.geminiModel || "gemini-3.5-flash");
+    if (typeof updateAiProviderUI === "function") updateAiProviderUI(settings.aiProvider || "gemini");
 
     chk("set-karaoke", settings.karaoke);
     const kHi = $("set-karaoke-hi"); if (kHi) kHi.value = "#" + (settings.karaokeHi || "FFE000");
@@ -1407,6 +1441,46 @@ function parseDictRules(str) {
     return rules;
 }
 
+function updateDictCount() {
+    const el = $("dict-rule-count");
+    const errEl = $("dict-errors");
+    if (!el) return;
+    const raw = (settings.customDict || "").trim();
+    if (!raw) { el.textContent = ""; if (errEl) errEl.textContent = ""; return; }
+    const lines = raw.split(/\r?\n/).filter(l => l.trim());
+    const rules = parseDictRules(raw);
+    const invalid = lines.length - rules.length;
+    el.textContent = rules.length + " rule" + (rules.length !== 1 ? "s" : "") + " active";
+    if (errEl) errEl.textContent = invalid > 0 ? invalid + " invalid line" + (invalid !== 1 ? "s" : "") + " (missing =)" : "";
+}
+
+function applyPunctuationFilter(opts) {
+    opts = opts || {};
+    if (settings.punctAllowed === undefined || settings.punctAllowed === null) return 0;
+    const allowed = settings.punctAllowed;
+    const allPunct = ".,?!:;\"'()[]{}-";
+    let stripRegexStr = "";
+    for (const char of allPunct) {
+        if (!allowed.includes(char)) stripRegexStr += escRe(char);
+    }
+    if (!stripRegexStr) return 0;
+    const regex = new RegExp(`[${stripRegexStr}]`, "g");
+    
+    let changed = 0;
+    segments.forEach(s => {
+        if (!s.text) return;
+        const old = s.text;
+        // removing punctuation might leave double spaces, let's fix them
+        s.text = s.text.replace(regex, "").replace(/\s{2,}/g, " ").trim();
+        if (s.text !== old) changed++;
+    });
+    if (changed > 0 && !opts.silent) {
+        renderSegments();
+        if (selectedIndex >= 0) selectSegment(selectedIndex);
+    }
+    return changed;
+}
+
 function applyDictionary(opts) {
     opts = opts || {};
     const rules = parseDictRules(settings.customDict);
@@ -1513,14 +1587,279 @@ function buildFindRegex() {
 function toggleFindReplace() {
     const p = $("find-panel");
     const show = p.style.display === "none" || !p.style.display;
-    p.style.display = show ? "block" : "none";
-    if (show) { $("find-input").focus(); $("find-input").select(); updateFindCount(); }
-    else { clearFindHighlight(); }
+    if (show) {
+        closeSyncPanel();
+        p.style.display = "flex";
+        $("find-input").focus();
+        $("find-input").select();
+        updateFindCount();
+    } else {
+        closeFindReplace();
+    }
 }
 
 function closeFindReplace() {
     $("find-panel").style.display = "none";
     clearFindHighlight();
+}
+
+function toggleSyncPanel() {
+    const sp = $("sync-panel");
+    const show = sp.style.display === "none" || !sp.style.display;
+    if (show) {
+        closeFindReplace();
+        sp.style.display = "flex";
+        $("sync-input").focus();
+    } else {
+        closeSyncPanel();
+    }
+}
+
+function closeSyncPanel() {
+    if ($("sync-panel")) $("sync-panel").style.display = "none";
+}
+
+function toggleAiPanel() {
+    const ap = $("ai-panel");
+    const show = ap.style.display === "none" || !ap.style.display;
+    if (show) {
+        closeFindReplace();
+        closeSyncPanel();
+        ap.style.display = "flex";
+    } else {
+        closeAiPanel();
+    }
+}
+
+function closeAiPanel() {
+    if ($("ai-panel")) $("ai-panel").style.display = "none";
+}
+
+function fmtMMSS(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `[${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}]`;
+}
+
+function updateAiProviderUI(provider) {
+    const ids = ["gemini", "openai", "anthropic", "custom"];
+    ids.forEach(id => {
+        const el = $("api-key-" + id);
+        if (el) el.style.display = (id === provider) ? "block" : "none";
+    });
+}
+
+async function askAi(type) {
+    const provider = settings.aiProvider || "gemini";
+    
+    // Retrieve correct API key based on provider
+    let key = "";
+    if (provider === "gemini") key = settings.geminiApiKey || "";
+    else if (provider === "openai") key = settings.openaiApiKey || "";
+    else if (provider === "anthropic") key = settings.anthropicApiKey || "";
+    else if (provider === "custom") key = settings.customApiKey || "";
+
+    if (!key && provider !== "custom") {
+        showError("Missing API Key", `Please enter your ${provider.toUpperCase()} API Key in the Settings panel under 'AI & API'.`);
+        return;
+    }
+    
+    if (segments.length === 0) {
+        showToast("No transcription available to analyze.", "error");
+        return;
+    }
+    
+    // Build transcript
+    let transcript = "";
+    segments.forEach(seg => {
+        if (!seg.text) return;
+        transcript += `${fmtMMSS(seg.start)} ${seg.text}\n`;
+    });
+    
+    const STRICT_RULE = "IMPORTANT: Return ONLY the raw requested data. Do not include conversational filler, introductions, or conclusions like 'Here is your analysis' or 'Great topic'.";
+    
+    let prompt = "";
+    if (type === "summary") {
+        prompt = `Analyze the following video transcript. Provide 3 catchy, SEO-friendly YouTube titles and a well-written description summary (2-3 paragraphs).\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+    } else if (type === "shorts") {
+        prompt = `Analyze the following video transcript and identify the top 3 most engaging 30-60 second segments that would make viral YouTube Shorts. For each short, provide the start/end timecodes, a catchy title, and a brief explanation.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+    } else if (type === "broll") {
+        prompt = `Analyze the following video transcript. Suggest 5-10 strategic B-roll (stock footage) inserts to make the video more engaging. Provide the exact timecode for each insert and describe the visual clearly.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+    } else if (type === "tags") {
+        prompt = `Generate a comma-separated list of 15-20 highly searched YouTube tags and 3-5 relevant hashtags (#) for this video based on the transcript.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+    } else if (type === "translate_en") {
+        prompt = `Translate the following video transcript into English. You MUST preserve the exact timecodes exactly as they appear. Return ONLY the translated transcript.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+    } else if (type === "grammar") {
+        prompt = `Analyze the following video transcript. Fix all spelling, punctuation, and grammatical errors without changing the timecodes. Return ONLY the fully corrected transcript with the exact same timecodes.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+    }
+    
+    const outBox = $("ai-output");
+    const applyBtn = $("ai-apply-btn");
+    if (applyBtn) applyBtn.style.display = "none";
+    
+    outBox.value = "Thinking...";
+    const model = settings.geminiModel || "gemini-3.5-flash";
+    const systemPrompt = "You are an expert video editor and YouTube strategist. Respond clearly using Markdown formatting. If the transcript is in Turkish, respond in Turkish unless asked to translate. If English, respond in English.";
+    
+    try {
+        let text = "";
+        
+        if (provider === "gemini") {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] }
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || "API Error");
+            text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+        } 
+        else if (provider === "anthropic") {
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json", 
+                    "x-api-key": key, 
+                    "anthropic-version": "2023-06-01",
+                    "anthropic-dangerously-allow-browser": "true" 
+                },
+                body: JSON.stringify({
+                    model: model || "claude-3-5-sonnet-20240620",
+                    max_tokens: 4096,
+                    system: systemPrompt,
+                    messages: [{ role: "user", content: prompt }]
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || "API Error");
+            text = data.content?.[0]?.text || "No response generated.";
+        }
+        else {
+            // OpenAI or Custom OpenAI-compatible
+            const url = provider === "custom" && settings.customApiUrl ? settings.customApiUrl + "/chat/completions" : "https://api.openai.com/v1/chat/completions";
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json", 
+                    "Authorization": `Bearer ${key}`
+                },
+                body: JSON.stringify({
+                    model: model || "gpt-4o",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: prompt }
+                    ]
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || "API Error");
+            text = data.choices?.[0]?.message?.content || "No response generated.";
+        }
+        
+        outBox.value = text;
+        
+        if (type === "grammar" || type === "translate_en") {
+            if (applyBtn) applyBtn.style.display = "inline-flex";
+        }
+    } catch (e) {
+        console.error("AI Error:", e);
+        outBox.value = "Error: " + e.message;
+    }
+}
+
+function applyAiToSubtitles() {
+    let text = $("ai-output").value;
+    if (!text || text.includes("Error:") || text.includes("Thinking...")) return;
+    
+    // Clean up AI output: remove timecode anchors like [00:39] or **[00:00:10]** 
+    text = text.replace(/\[?\d{1,2}:\d{2}(:\d{2})?(\.\d{1,3})?\]?/g, function(match) {
+        // Only strip if it's bracketed OR looks exactly like a timecode at the start/end
+        if (match.includes("[") || match.includes("]")) return " ";
+        return match; 
+    });
+    // Also remove bracketed timecodes explicitly just in case
+    text = text.replace(/\[\d{1,2}:\d{2}\]/g, " ");
+    
+    // Remove markdown formatting that interferes with word diffing
+    text = text.replace(/(\*\*|\_\_|\*|\_)/g, "");
+
+    $("sync-input").value = text;
+    doSyncText();
+}
+
+function doSyncText() {
+    if (segments.length === 0) return;
+    const correctText = $("sync-input").value.trim();
+    if (!correctText) return;
+    
+    setStatus("Syncing text with original timing...", "info");
+    
+    let Diff;
+    try {
+        Diff = require("diff");
+    } catch (e) {
+        showError("Missing dependency", "Please run 'npm install diff' in the app directory.");
+        return;
+    }
+
+    const currentWords = [];
+    const wordSegments = [];
+    segments.forEach((seg, i) => {
+        const words = (seg.text || "").split(/\s+/).filter(Boolean);
+        words.forEach(w => {
+            currentWords.push(w);
+            wordSegments.push(i);
+        });
+    });
+
+    const correctWords = correctText.split(/\s+/).filter(Boolean);
+    const changes = Diff.diffArrays(currentWords, correctWords, { ignoreCase: true });
+
+    const newSegText = new Array(segments.length).fill("");
+    let oldIndex = 0;
+    let lastValidSeg = 0;
+
+    for (let i = 0; i < changes.length; i++) {
+        const change = changes[i];
+        if (change.removed) {
+            if (i + 1 < changes.length && changes[i+1].added) {
+                const addChange = changes[i+1];
+                const targetSeg = oldIndex < wordSegments.length ? wordSegments[oldIndex] : lastValidSeg;
+                for (const w of addChange.value) newSegText[targetSeg] += w + " ";
+                i++;
+            }
+            oldIndex += change.count;
+        } else if (change.added) {
+            const targetSeg = lastValidSeg;
+            for (const w of change.value) newSegText[targetSeg] += w + " ";
+        } else {
+            for (const w of change.value) {
+                const targetSeg = wordSegments[oldIndex];
+                newSegText[targetSeg] += w + " ";
+                lastValidSeg = targetSeg;
+                oldIndex++;
+            }
+        }
+    }
+
+    let changedCount = 0;
+    segments.forEach((s, i) => {
+        const nt = newSegText[i].trim();
+        if (s.text !== nt) {
+            s.text = nt;
+            changedCount++;
+        }
+    });
+
+    renderSegments();
+    if (selectedIndex >= 0) selectSegment(selectedIndex);
+    
+    if ($("sync-status")) $("sync-status").textContent = `Matched! ${changedCount} segment(s) updated.`;
+    setStatus(`Text synced. ${changedCount} segment(s) modified.`, "success");
+    showToast(`Text synchronized! (${changedCount} modified)`, "success");
 }
 
 function clearFindHighlight() {
@@ -1885,6 +2224,7 @@ async function startTranscription() {
                 setStatus("Transcribing (Subsper engine)…", "info");
                 const r = await W.transcribeWav({
                     appDir: extDir(), wavPath: tmpAudio, modelKey: model, language,
+                    initialPrompt: settings.promptWords || "",
                     spawnOpts: { env: spawnEnv() },
                     onLog: s => { const m = /progress\s*=\s*(\d+)\s*%/i.exec(s); if (m) setStatus(`Transcribing… ${m[1]}%`, "info"); },
                 });
@@ -1907,7 +2247,7 @@ async function startTranscription() {
             const engLabel = { whisperx: "WhisperX", mlx: "mlx-whisper", openai: "openai-whisper", auto: "Whisper" }[settings.engine] || "Whisper";
             setStatus(`Transcribing with ${engLabel}… (first run may download the model)`, "info");
             txRes = await runPython("transcribe.py",
-                [tmpAudio, model, language, settings.engine, settings.diarize ? "1" : "0"],
+                [tmpAudio, model, language, settings.engine, settings.diarize ? "1" : "0", settings.promptWords || ""],
                 stderr => {
                     if (stderr.includes("Downloading") || stderr.includes("download"))
                         setStatus("Downloading model… (one-time, please wait)", "info");
@@ -1953,6 +2293,7 @@ async function startTranscription() {
             seqEnd:   seqInfo.inTime + seg.end,
         }));
 
+        applyPunctuationFilter({ silent: true });
         renderSegments();
 
         if (segments.length === 0) {
@@ -2366,107 +2707,6 @@ async function sendToPremiere() {
     }
 }
 
-// ── Send as styled Essential Graphics (MOGRT) — like AutoCut / FireCut ─────
-async function sendStyledGraphics() {
-    if (segments.length === 0) return;
-
-    const mogrt = settings.mogrtPath;
-    if (!mogrt || !fs.existsSync(mogrt)) {
-        setStatus("No MOGRT template selected", "warning");
-        showError(
-            t("err_nomogrt_what"),
-            t("err_nomogrt_why"),
-            t("err_nomogrt_fix"),
-            t("btn_pickmogrt"),
-            () => { switchMainTab("transcribe"); switchSubTab("transcribe", "settings"); setTimeout(pickMOGRT, 150); }
-        );
-        return;
-    }
-
-    sendBtn.disabled = true;
-    setStatus("Placing styled graphics on the timeline…", "info");
-    showProgress(true);
-    hideError(); hideSRTSaved();
-
-    const finalSegs = settings.gapFill ? applyGapFill(segments, settings.gapMax) : segments;
-    const items = finalSegs.map(seg => ({
-        text:  settings.autoSplit ? wrapText(seg.text, settings.maxCharsPerLine, settings.maxLines) : seg.text,
-        start: seg.seqStart,
-        end:   seg.seqEnd,
-    }));
-    const payload = JSON.stringify({ mogrtPath: mogrt.replace(/\\/g, "/"), items });
-    const escaped = payload.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-
-    const result = await evalScript(`importTextGraphics('${escaped}')`);
-
-    showProgress(false);
-    sendBtn.disabled = false;
-
-    if (result.diag) console.log("[Whisper] graphics diag:", result.diag);
-
-    if (result && result.success && result.placed > 0) {
-        setStatus(`✓ Placed ${result.placed} styled graphic(s) on track V${(result.track || 0) + 1}`, "success");
-        showToast(`${result.placed} styled captions added to the timeline`, "success", 5000);
-    } else {
-        const err = (result && result.error) || "Could not place graphics.";
-        handleError(err);
-        if (result && result.diag) {
-            showError(
-                "Styled graphics could not be placed correctly.",
-                "Diagnostic (send me this): " + result.diag.join("  •  "),
-                "This usually means the MOGRT's text parameter name differs in your Premiere version — paste the diagnostic above and I'll tune it."
-            );
-        }
-    }
-}
-
-// Pick a .mogrt template file (CEP file dialog)
-function pickMOGRT() {
-    let chosen = null;
-    try {
-        if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
-            const res = window.cep.fs.showOpenDialogEx(false, false, "Choose a .mogrt template", "", ["mogrt"]);
-            if (res && res.data && res.data.length) chosen = res.data[0];
-        }
-    } catch (e) {}
-    if (!chosen) {
-        // Fallback: hidden file input
-        const inp = document.getElementById("mogrt-file-input");
-        if (inp) {
-            inp.onchange = e => {
-                const f = e.target.files[0];
-                if (f && f.path) { settings.mogrtPath = f.path; saveSettings(); updateMogrtLabel(); showToast("MOGRT selected", "success"); }
-                inp.value = "";
-            };
-            inp.click();
-        }
-        return;
-    }
-    settings.mogrtPath = chosen;
-    saveSettings();
-    updateMogrtLabel();
-    showToast("MOGRT template selected", "success");
-}
-
-function updateMogrtLabel() {
-    const el = $("mogrt-name");
-    if (el) {
-        const p = settings.mogrtPath;
-        el.textContent = p ? p.split(/[\\/]/).pop() : t("mogrt_none");
-        el.classList.toggle("set", !!p);
-    }
-}
-
-function onSendModeChange(val) {
-    settings.sendMode = val;
-    saveSettings();
-    const sub = $("graphics-sub");
-    if (sub) sub.style.display = val === "graphics" ? "block" : "none";
-    // reflect on the send button label
-    const sb = $("send-btn");
-    if (sb) sb.querySelector("span") && (sb.querySelector("span").textContent =
-        val === "graphics" ? t("act_send_gfx") : t("act_send"));
-}
 
 // ── Setup / Diagnostics ───────────────────────────────────────────────────
 let diagData = null;
@@ -2588,12 +2828,12 @@ function builtinEngineReady() {
 }
 
 function renderChecks(data) {
-    const keys = [
-        { key: "python"     },
-        { key: "ffmpeg"     },
-        { key: "whisperx"   },   // optional Pro — speaker labels
-    ];
-    // Built-in engine row first — this is what 99% of users use; needs no setup.
+    // CORE = built-in prerequisites + WhisperX (speaker labels) which keeps an
+    // install button. Everything else (openai-whisper, mlx, punctuation) is not
+    // needed — the Built-in engine already transcribes + punctuates — so it's hidden.
+    const CORE  = ["python", "ffmpeg", "whisperx"];
+    const EXTRA = [];   // openai-whisper / mlx hidden entirely — Built-in covers them
+
     const bi = builtinEngineReady();
     let html = `<div class="check-item">
       <div class="check-icon check-${bi ? "ok" : "warn"}">${icon(bi ? "check" : "alert")}</div>
@@ -2602,27 +2842,34 @@ function renderChecks(data) {
         <div class="check-detail ${bi ? "ok" : "warn"}">${bi ? t("ds_builtin_ok") : t("ds_builtin_dl")}</div>
       </div>
     </div>`;
-    for (const { key } of keys) {
-        const c = data[key]; if (!c) continue;
+
+    const row = (key, allowFix) => {
+        const c = data[key]; if (!c) return "";
         const st = c.status;             // ok | warn | missing | na
         const ok = st === "ok";
         const opt = c.optional;
         let ico, cls;
         if (st === "ok")        { ico = icon("check"); cls = "ok"; }
         else if (st === "warn") { ico = icon("alert"); cls = "warn"; }
+        else if (!allowFix)     { ico = icon("close"); cls = "opt"; }   // extras: always muted
         else if (st === "na")   { ico = icon("close"); cls = "opt"; }
         else if (opt)           { ico = icon("close"); cls = "opt"; }
         else                    { ico = icon("close"); cls = "bad"; }
-        const showFix = (st === "missing" || (!ok && !opt && st !== "na")) && c.fix_cmd;
-        html += `<div class="check-item">
+        const showFix = allowFix && (st === "missing" || (!ok && !opt && st !== "na")) && c.fix_cmd;
+        // For an extra that's not installed, replace the noisy detail with a calm note.
+        const detail = (!ok && !allowFix) ? t("opt_alt_note") : (c.detail || "");
+        return `<div class="check-item">
           <div class="check-icon check-${cls}">${ico}</div>
           <div class="check-body">
             <div class="check-name">${c.label}</div>
-            <div class="check-detail ${cls}">${c.detail || ""}</div>
+            <div class="check-detail ${cls}">${detail}</div>
             ${showFix ? renderFixRow(key, c) : ""}
           </div>
         </div>`;
-    }
+    };
+
+    html += CORE.map(k => row(k, true)).join("");
+    html += EXTRA.map(k => row(k, false)).join("");
     $("checks-list").innerHTML = `<div class="glist">${html}</div>`;
 }
 

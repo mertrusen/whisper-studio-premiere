@@ -14,6 +14,7 @@
       <div class="brand-text">
         <span class="brand-title">Sub<span>sper</span></span>
         <span class="brand-tagline" data-i18n="tagline">AI Subtitles</span>
+        <span class="brand-version" style="font-size: 10px; color: var(--text3); margin-left: 6px; font-weight: 500;">v1.6.8</span>
       </div>
     </div>
     <div class="header-right">
@@ -76,20 +77,17 @@
 
   <!-- ═══ PANEL: TRANSCRIBE — WORK ═══ -->
   <div id="panel-tx-work" class="panel">
-
+    <div class="work-left">
     <div class="status-bar info" id="status-bar" data-i18n="status_ready">Ready</div>
     <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
 
     <div class="controls">
-      <button class="btn-transcribe" id="transcribe-btn" onclick="startTranscription()" data-i18n-tip="tip_transcribe">
-        <span class="ico ic" data-icon="mic"></span><span data-i18n="btn_transcribe">Transcribe In/Out Selection</span>
-      </button>
-      <div class="transport-row">
-        <button class="btn-load-srt" onclick="importSRTFile()" style="margin-top:0" data-i18n-tip="tip_loadsrt">
-          <span class="ic" data-icon="folder"></span><span data-i18n="btn_loadsrt">Load SRT</span>
+      <div style="display:flex; gap:8px; margin-bottom: 8px;">
+        <button class="btn-transcribe" id="transcribe-btn" onclick="startTranscription()" style="flex:2; margin-top:0; margin-bottom:0; font-size:12px; padding:8px 12px; height:34px" data-i18n-tip="tip_transcribe">
+          <span class="ico ic" data-icon="mic"></span><span data-i18n="btn_transcribe">Transcribe File</span>
         </button>
-        <button class="btn-playpause" id="playpause-btn" onclick="playPause()" data-i18n-tip="tip_play">
-          <span class="ic" data-icon="play"></span><span data-i18n="btn_play">Play</span>
+        <button class="btn-load-srt" onclick="importSRTFile()" style="flex:1; margin-top:0; font-size:12px; padding:8px 12px; height:34px" data-i18n-tip="tip_loadsrt">
+          <span class="ic" data-icon="folder"></span><span data-i18n="btn_loadsrt">Load SRT</span>
         </button>
       </div>
       <input type="file" id="srt-file-input" accept=".srt" style="display:none">
@@ -133,28 +131,78 @@
     </div>
 
     <!-- Find & Replace -->
-    <div class="find-panel" id="find-panel" style="display:none">
-      <div class="find-row">
-        <input type="text" id="find-input" data-i18n-ph="find_ph" placeholder="Find…" oninput="updateFindCount()"
-               onkeydown="if(event.key==='Enter'){event.shiftKey?findPrev():findNext();}">
-        <label class="find-opt" data-i18n-tip="tip_case">
-          <input type="checkbox" id="find-case" onchange="updateFindCount()"> Aa
-        </label>
-        <button class="btn-secondary find-nav" onclick="findPrev()" data-i18n-tip="tip_findprev">▲</button>
-        <button class="btn-secondary find-nav" onclick="findNext()" data-i18n-tip="tip_findnext">▼</button>
-      </div>
-      <div class="find-actions" style="margin-bottom:6px">
-        <span class="find-count" id="find-count">—</span>
+    <div class="find-panel" id="find-panel" style="display:none; flex-direction:column; gap:6px;">
+      <div style="display:flex; justify-content:space-between; gap:6px; flex-wrap:wrap;">
+        <div class="find-row" style="flex:1;">
+          <input type="text" id="find-input" placeholder="Find…" oninput="updateFindCount()"
+                 onkeydown="if(event.key==='Enter'){event.shiftKey?findPrev():findNext();}">
+          <label class="find-opt" data-i18n-tip="tip_case">
+            <input type="checkbox" id="find-case" onchange="updateFindCount()"> Aa
+          </label>
+          <button class="btn-secondary find-nav" onclick="findPrev()" data-i18n-tip="tip_findprev">▲</button>
+          <button class="btn-secondary find-nav" onclick="findNext()" data-i18n-tip="tip_findnext">▼</button>
+          <span class="find-count" id="find-count" style="margin-left: 6px">—</span>
+        </div>
         <button class="btn-secondary" onclick="closeFindReplace()" data-i18n="btn_close">Close</button>
       </div>
       <div class="find-row">
-        <input type="text" id="replace-input" data-i18n-ph="replace_ph" placeholder="Replace with… (optional)"
+        <input type="text" id="replace-input" placeholder="Replace with… (optional)"
                data-i18n-tip="tip_replaceinput"
                onkeydown="if(event.key==='Enter')doReplaceAll()">
-        <button class="btn-send" id="replace-btn" onclick="doReplaceAll()" data-i18n-tip="tip_replaceall" data-i18n="btn_replaceall">Replace All</button>
+        <button class="btn-send" id="replace-btn" onclick="doReplaceAll()">Replace All</button>
       </div>
     </div>
 
+    <!-- Sync Correct Text -->
+    <div class="find-panel" id="sync-panel" style="display:none; flex-direction:column; gap:8px; overflow-y:auto">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <span style="font-size:12px; font-weight:600; color:var(--text)" data-i18n="sync_title">Sync with Correct Text</span>
+        <button class="btn-secondary" onclick="closeSyncPanel()" data-i18n="btn_close">Close</button>
+      </div>
+      <textarea id="sync-input" class="settings-textarea" rows="6" style="flex:1; min-height:100px; resize:none" data-i18n-ph="sync_ph" placeholder="Paste the fully corrected text here. This will replace words in subtitles while keeping the timing intact."></textarea>
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <span class="setting-hint" data-i18n="sync_hint" id="sync-status">Word alignment algorithm will modify the current segments.</span>
+        <button class="btn-send" onclick="doSyncText()" data-i18n="btn_sync">Sync</button>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="find-panel" id="ai-panel" style="display:none; flex-direction:column; gap:8px; overflow-y:auto; flex: 1; min-height: 200px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span style="font-size:12px; font-weight:600; color:var(--text)" data-i18n="lbl_ai_tools">AI Studio</span>
+        <div style="display:flex; gap: 6px; flex: 1; justify-content: flex-end;">
+          <select id="ai-panel-model" class="settings-textarea" style="height:24px; font-size:11.5px; padding:0 6px; max-width:140px; flex:1; margin-bottom:0;"
+                 onchange="if(this.value==='_custom'){ this.style.display='none'; document.getElementById('ai-panel-custom-input').style.display='inline-block'; document.getElementById('ai-panel-custom-input').focus(); } else { onSettingChange('geminiModel', this.value); if(document.getElementById('set-gemini-model')) { document.getElementById('set-gemini-model').value = this.value; } }">
+            <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+            <option value="gemini-3.1-pro">gemini-3.1-pro</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="claude-3-5-sonnet-20240620">claude-3.5-sonnet</option>
+            <option value="llama-3.1-70b-versatile">llama-3.1-70b</option>
+            <option value="_custom">Type custom...</option>
+          </select>
+          <input type="text" id="ai-panel-custom-input" class="settings-textarea" style="display:none; height:24px; font-size:11.5px; padding:0 6px; max-width:140px; flex:1; margin-bottom:0;" placeholder="Custom model..."
+                 onblur="if(this.value.trim()){ const m=this.value.trim(); const s=document.getElementById('ai-panel-model'); const opt=document.createElement('option'); opt.value=m; opt.innerText=m; opt.selected=true; s.appendChild(opt); onSettingChange('geminiModel', m); if(document.getElementById('set-gemini-model')){ const s2=document.getElementById('set-gemini-model'); const o2=document.createElement('option'); o2.value=m; o2.innerText=m; s2.appendChild(o2); s2.value=m; } } this.style.display='none'; document.getElementById('ai-panel-model').style.display='inline-block'; this.value='';"
+                 onkeydown="if(event.key==='Enter') this.blur();">
+          <button class="btn-secondary" onclick="closeAiPanel()" data-i18n="btn_close">Close</button>
+        </div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px">
+        <button class="btn-secondary" onclick="askAi('summary')" style="flex:1 1 30%">Summary & Title</button>
+        <button class="btn-secondary" onclick="askAi('shorts')" style="flex:1 1 30%">Extract Shorts</button>
+        <button class="btn-secondary" onclick="askAi('broll')" style="flex:1 1 30%">B-Roll Ideas</button>
+        <button class="btn-secondary" onclick="askAi('tags')" style="flex:1 1 30%">Tags / SEO</button>
+        <button class="btn-secondary" onclick="askAi('translate_en')" style="flex:1 1 30%">Translate EN</button>
+        <button class="btn-secondary" onclick="askAi('grammar')" style="flex:1 1 30%">Fix Grammar</button>
+      </div>
+      <textarea id="ai-output" class="settings-textarea" style="flex:1; min-height:100px; resize:vertical" data-i18n-ph="ai_ph" placeholder="Generated insights will appear here..." readonly></textarea>
+      <button class="btn-send" id="ai-apply-btn" onclick="applyAiToSubtitles()" style="display:none; margin-top: 4px;">
+        <span class="ic" data-icon="check"></span> Apply to Subtitles
+      </button>
+    </div>
+    </div> <!-- /work-left -->
+
+    <div class="work-right">
     <!-- Segments list -->
     <div class="segments-wrap" id="segments-wrap">
       <div class="empty-state">
@@ -168,6 +216,8 @@
     <div class="actions-bar" id="actions-bar" style="display:none">
       <span class="seg-count" id="seg-count" data-i18n-tip="tip_segcount"></span>
       <button class="btn-secondary" onclick="toggleFindReplace()" data-i18n-tip="tip_find"><span class="ic" data-icon="search"></span></button>
+      <button class="btn-secondary" onclick="toggleSyncPanel()" data-i18n-tip="tip_sync"><span class="ic" data-icon="refresh"></span></button>
+      <button class="btn-secondary" onclick="toggleAiPanel()" data-i18n-tip="tip_ai"><span class="ic" data-icon="wand"></span></button>
       <div class="export-wrap">
         <button class="btn-secondary" onclick="toggleCleanMenu()" data-i18n-tip="tip_clean"><span class="ic" data-icon="sparkles"></span></button>
         <div class="export-menu" id="clean-menu" style="display:none">
@@ -193,6 +243,7 @@
         <span class="ic" data-icon="send"></span><span data-i18n="act_send">Send to Premiere</span>
       </button>
     </div>
+    </div> <!-- /work-right -->
 
   </div><!-- /panel-tx-work -->
 
@@ -225,30 +276,6 @@
         </div>
       </div>
 
-      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_send">Send to Premiere</div>
-      <div class="setting-item">
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-name" data-i18n="nm_sendmode">Send subtitles as</div>
-            <div class="setting-desc" data-i18n="ds_sendmode">Caption track = simple. Styled graphics = editable text clips with your style (like AutoCut/FireCut).</div>
-          </div>
-        </div>
-        <div class="setting-sub" style="display:block; border-top:none; padding-top:8px">
-          <select id="set-sendmode" onchange="onSendModeChange(this.value)" data-i18n-tip="tip_sendmode">
-            <option value="caption" data-i18n="opt_caption">Caption track (SRT)</option>
-            <option value="graphics" data-i18n="opt_graphics">Styled graphics (MOGRT)</option>
-          </select>
-        </div>
-        <div class="setting-sub" id="graphics-sub" style="display:none">
-          <div class="setting-slider-header"><span data-i18n="lbl_mogrt">Style template (.mogrt)</span></div>
-          <div class="mogrt-row">
-            <span class="mogrt-name" id="mogrt-name" data-i18n="mogrt_none">No template chosen</span>
-            <button class="btn-secondary" onclick="pickMOGRT()" data-i18n-tip="tip_pickmogrt" data-i18n="btn_pickmogrt">Choose .mogrt…</button>
-          </div>
-          <div class="setting-hint" data-i18n="hint_mogrt">Export a styled text template once from Premiere: Graphics workspace → make a text layer → Export Motion Graphics Template. Then pick it here.</div>
-          <input type="file" id="mogrt-file-input" accept=".mogrt" style="display:none">
-        </div>
-      </div>
 
       <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_modellang">Model &amp; Language</div>
       <div class="setting-item">
@@ -289,26 +316,38 @@
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-name" data-i18n="nm_engine">Engine</div>
-            <div class="setting-desc" data-i18n="ds_engine">WhisperX gives the most accurate word timing + speaker labels</div>
+            <div class="setting-desc" data-i18n="ds_engine">Built-in works instantly with no setup. Pro engines need Python (optional).</div>
           </div>
         </div>
         <div class="setting-sub" style="display:block; border-top:none; padding-top:8px">
           <select id="set-engine" onchange="onSettingChange('engine', this.value)" data-i18n-tip="tip_engine">
-            <option value="whisperx">WhisperX — word-level + speakers ★</option>
-            <option value="mlx">mlx-whisper — fastest on Apple Silicon</option>
-            <option value="openai">openai-whisper — most compatible</option>
-            <option value="auto">Auto — WhisperX → mlx → openai</option>
+            <option value="cpp" data-i18n="opt_eng_cpp">Subsper Built-in — no setup needed ★</option>
+            <option value="whisperx" data-i18n="opt_eng_whisperx">Pro: WhisperX — speaker labels (needs Python)</option>
+            <option value="mlx" data-i18n="opt_eng_mlx">Pro: mlx-whisper — Apple Silicon (needs Python)</option>
+            <option value="openai" data-i18n="opt_eng_openai">Pro: openai-whisper (needs Python)</option>
           </select>
+          <div id="engine-pro-note" class="setting-desc" style="display:none; margin-top:6px; color:var(--accent)"></div>
         </div>
         <div class="setting-row" style="margin-top:10px">
           <div class="setting-info">
-            <div class="setting-name" data-i18n="nm_diar">Speaker Labels</div>
-            <div class="setting-desc" data-i18n="ds_diar">Tags who is speaking. WhisperX only — needs a free HuggingFace token.</div>
+            <div class="setting-name" data-i18n="nm_diar">Speaker Labels (Pro)</div>
+            <div class="setting-desc" data-i18n="ds_diar">Tags who is speaking. Needs the WhisperX Pro engine + a free HuggingFace token.</div>
           </div>
           <label class="toggle" data-i18n-tip="tip_diar">
             <input type="checkbox" id="set-diarize" onchange="onSettingChange('diarize', this.checked)">
             <span class="toggle-track"></span>
           </label>
+        </div>
+        <div class="setting-row" style="margin-top:10px">
+          <div class="setting-info">
+            <div class="setting-name" data-i18n="nm_threads">CPU Threads</div>
+            <div class="setting-desc" data-i18n="ds_threads">Number of threads for the built-in engine. 0 = use all cores.</div>
+          </div>
+          <span class="setting-value" id="threads-val">Auto</span>
+        </div>
+        <div class="setting-sub" style="display:block; border-top:none; padding-top:4px">
+          <input type="range" class="setting-slider" id="set-threads" min="0" max="32" step="1" value="0" data-i18n-tip="tip_threads"
+                 oninput="onSettingChange('threads', +this.value); document.getElementById('threads-val').textContent = this.value == 0 ? 'Auto' : this.value">
         </div>
       </div>
 
@@ -327,10 +366,29 @@
 
         <div class="setting-sub" style="display:block">
           <div class="setting-slider-header"><span data-i18n="lbl_dict">Custom dictionary</span></div>
-          <textarea id="set-dict" class="settings-textarea" rows="4"
-                    placeholder="wrong=right&#10;istanbul=İstanbul&#10;chat gpt=ChatGPT"
-                    oninput="onSettingChange('customDict', this.value)"></textarea>
+          <textarea id="set-dict" class="settings-textarea" rows="8"
+                    placeholder="wrong=right&#10;istanbul=İstanbul&#10;chat gpt=ChatGPT&#10;soap=Soap&#10;cpt=Captain"
+                    oninput="onSettingChange('customDict', this.value); updateDictCount()"></textarea>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:4px">
+            <span id="dict-rule-count" style="font-size:11px; color:var(--accent); font-weight:600"></span>
+            <span id="dict-errors" style="font-size:11px; color:var(--red, #ff4444)"></span>
+          </div>
           <div class="setting-hint" data-i18n="hint_dict">Fixes names, brands &amp; mis-hearings. Format: wrong=right (whole word, case-insensitive).</div>
+        </div>
+
+        <div class="setting-sub" style="display:block; margin-top:8px">
+          <div class="setting-slider-header"><span data-i18n="lbl_prompt_words">Context words (AI prompt)</span></div>
+          <textarea id="set-prompt-words" class="settings-textarea" rows="4"
+                    placeholder="Captain Price, Soap MacTavish, antikuagülan, Subsper"
+                    oninput="onSettingChange('promptWords', this.value)"></textarea>
+          <div class="setting-hint" data-i18n="hint_prompt_words">Difficult words/names that the AI might mis-hear. These are sent as a prompt to improve accuracy. Comma-separated.</div>
+        </div>
+
+        <div class="setting-sub" style="display:block; margin-top:8px">
+          <div class="setting-slider-header"><span data-i18n="lbl_punct_filter">Allowed Punctuation</span></div>
+          <input type="text" id="set-punct-allowed" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px"
+                 oninput="onSettingChange('punctAllowed', this.value)">
+          <div class="setting-hint" data-i18n="hint_punct_filter">Only these punctuation marks will be kept. Delete all to remove all punctuation.</div>
         </div>
 
         <div class="setting-row" style="margin-top:12px">
@@ -366,6 +424,61 @@
                     placeholder="word1, word2"
                     oninput="onSettingChange('profanityList', this.value)"></textarea>
           <div class="setting-hint" data-i18n="hint_cleanrun">Run any of these from the clean-up menu on the Subtitles tab.</div>
+        </div>
+      </div>
+
+      <div class="setup-section-title" style="margin-top:16px" data-i18n="sec_api">AI & API</div>
+      <div class="setting-item">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">AI Provider</div>
+          </div>
+          <select id="set-ai-provider" style="max-width:130px" onchange="onSettingChange('aiProvider', this.value); updateAiProviderUI(this.value)">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI (ChatGPT)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="custom">Custom (OpenAI-Compat)</option>
+          </select>
+        </div>
+        <div class="setting-sub" style="display:block; border-top:none; padding-top:4px">
+          <div id="api-key-gemini" style="display:block;">
+            <div class="setting-slider-header"><span>Gemini API Key</span></div>
+            <input type="password" id="set-gemini-key" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px"
+                   oninput="onSettingChange('geminiApiKey', this.value)">
+          </div>
+          <div id="api-key-openai" style="display:none;">
+            <div class="setting-slider-header"><span>OpenAI API Key</span></div>
+            <input type="password" id="set-openai-key" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px"
+                   oninput="onSettingChange('openaiApiKey', this.value)">
+          </div>
+          <div id="api-key-anthropic" style="display:none;">
+            <div class="setting-slider-header"><span>Anthropic API Key</span></div>
+            <input type="password" id="set-anthropic-key" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px"
+                   oninput="onSettingChange('anthropicApiKey', this.value)">
+          </div>
+          <div id="api-key-custom" style="display:none;">
+            <div class="setting-slider-header"><span>Custom Base URL</span></div>
+            <input type="text" id="set-custom-url" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px; margin-bottom:4px;"
+                   oninput="onSettingChange('customApiUrl', this.value)" placeholder="https://api.groq.com/openai/v1">
+            <div class="setting-slider-header"><span>Custom API Key (Optional)</span></div>
+            <input type="password" id="set-custom-key" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px"
+                   oninput="onSettingChange('customApiKey', this.value)">
+          </div>
+          
+          <div class="setting-slider-header" style="margin-top:12px"><span>Default Model</span></div>
+          <select id="set-gemini-model" class="settings-textarea" style="height:32px; font-size:14px; padding:0 8px; width:100%"
+                 onchange="if(this.value==='_custom'){ this.style.display='none'; document.getElementById('set-gemini-custom-input').style.display='block'; document.getElementById('set-gemini-custom-input').focus(); } else { onSettingChange('geminiModel', this.value); if(document.getElementById('ai-panel-model')) { document.getElementById('ai-panel-model').value = this.value; } }">
+            <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+            <option value="gemini-3.1-pro">gemini-3.1-pro</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="claude-3-5-sonnet-20240620">claude-3.5-sonnet</option>
+            <option value="llama-3.1-70b-versatile">llama-3.1-70b</option>
+            <option value="_custom">Type custom...</option>
+          </select>
+          <input type="text" id="set-gemini-custom-input" class="settings-textarea" style="display:none; height:32px; font-size:14px; padding:0 8px; width:100%;" placeholder="Custom model..."
+                 onblur="if(this.value.trim()){ const m=this.value.trim(); const s=document.getElementById('set-gemini-model'); const opt=document.createElement('option'); opt.value=m; opt.innerText=m; opt.selected=true; s.appendChild(opt); onSettingChange('geminiModel', m); if(document.getElementById('ai-panel-model')){ const a=document.getElementById('ai-panel-model'); const o2=document.createElement('option'); o2.value=m; o2.innerText=m; a.appendChild(o2); a.value=m; } } this.style.display='none'; document.getElementById('set-gemini-model').style.display='block'; this.value='';"
+                 onkeydown="if(event.key==='Enter') this.blur();">
         </div>
       </div>
 
@@ -648,7 +761,11 @@
   <div id="panel-setup" class="panel" style="display:none">
     <div class="setup-scroll">
 
-      <div class="setup-section-title" data-i18n="sec_syscheck">System Check</div>
+      <div class="setup-optional-banner" data-i18n="setup_optional">✓ Subsper works out of the box — no setup needed. This page is only for optional Pro features (speaker labels).</div>
+
+      <div class="setup-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span data-i18n="sec_syscheck">System Check (optional / Pro)</span>
+      </div>
       <div id="checks-list"><div class="check-loading">Checking…</div></div>
 
       <div class="setup-section-title" style="margin-top:14px" data-i18n="sec_models">Whisper Models</div>
@@ -659,7 +776,6 @@
 
       <div class="setup-btn-row">
         <button class="btn-recheck" onclick="runDiagnostics()" data-i18n-tip="tip_recheck"><span class="ic" data-icon="refresh"></span> <span data-i18n="btn_recheck">Re-check</span></button>
-        <button class="btn-reload"  onclick="reloadExtension()" data-i18n-tip="tip_reload"><span class="ic" data-icon="reload"></span> <span data-i18n="btn_reload">Reload Extension</span></button>
       </div>
 
     </div>
@@ -668,6 +784,9 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
+  <!-- DESKTOP footer (NOT the extension's CSInterface). Order matters:
+       desktop-shim defines fake CSInterface + __APP_DIR__ BEFORE main.js,
+       desktop-app overrides the Premiere I/O boundary AFTER main.js. -->
   <script src="js/CSInterface.js"></script>
   <script src="js/main.js"></script>
 </body>

@@ -61,9 +61,9 @@ function exeName(base) {
     return process.platform === "win32" ? base + ".exe" : base;
 }
 
-// Where the installed Subsper DESKTOP app keeps its bundled engine. The Premiere
-// extension reuses it, so installing the desktop app makes the extension work
-// too — no terminal, no separate engine install.
+// Where the installed Subsper DESKTOP app keeps its bundled engine — so the
+// Premiere extension reuses it (installing the desktop makes the extension work).
+// Harmless on the desktop itself (its own bundled binary is found first).
 function _desktopAppBins(name) {
     const exe = exeName(name);
     const rel = path.join("bin", platKey(), exe);
@@ -492,40 +492,74 @@ function transcribeWav(opts) {
         if (lang) { args.push("--language", lang); }
         else      { args.push("--language", "auto"); }
 
-        const bin = whisperBin(appDir);
-        dbg("whisper-cli: " + bin);
+        let bin = whisperBin(appDir);
+        let gpuBin = null;
+        if (process.platform === "win32") {
+            const gb = resolveBin(appDir, "whisper-cli-gpu", []);
+            if (gb !== "whisper-cli-gpu.exe" && safeExists(gb)) {
+                try {
+                    const paths = [
+                        path.join(process.env.WINDIR || "C:\\Windows", "System32", "vulkan-1.dll"),
+                        path.join(process.env.WINDIR || "C:\\Windows", "SysWOW64", "vulkan-1.dll")
+                    ];
+                    if (paths.some(p => fs.existsSync(p))) gpuBin = gb;
+                } catch(e) {}
+            }
+        }
+        
+        let currentBin = gpuBin || bin;
+        dbg("whisper-cli target: " + currentBin + (gpuBin ? " (GPU)" : " (CPU)"));
         dbg("  model=" + mdl + " | wav=" + wav + " | lang=" + (lang || "auto"));
         if (!safeExists(bin)) return reject(new Error("Engine binary not found: " + bin));
         if (!safeExists(wav)) return reject(new Error("Audio file missing: " + wav));
-        const wc = cp.spawn(bin, args, opts.spawnOpts || {});
-        if (opts.signal) {
-            if (opts.signal.aborted) { wc.kill(); return reject(new Error("Transcription cancelled")); }
-            opts.signal.addEventListener('abort', () => { dbg("abort signal received, killing whisper-cli"); wc.kill(); }, { once: true });
-        }
-        let err = "";
-        wc.stdout.on("data", d => { if (opts.onLog) opts.onLog(d.toString()); });
-        wc.stderr.on("data", d => {
-            const s = d.toString(); err += s;
-            if (opts.onLog) opts.onLog(s);
-        });
-        wc.on("error", e => { dbg("whisper-cli spawn ERROR: " + e.message); reject(new Error("whisper.cpp could not run: " + e.message)); });
-        wc.on("close", code => {
-            const outJson = outBase + ".json";
-            dbg("whisper-cli exit " + code + (safeExists(outJson) ? " (json produced)" : " (no json)"));
-            if (code !== 0 && !safeExists(outJson)) {
-                return reject(new Error("whisper.cpp failed (exit " + code + "): " + err.slice(-500)));
+        
+        const launch = (exePath, isFallback) => {
+            if (isFallback) dbg("FALLBACK: Retrying with CPU binary: " + exePath);
+            const wc = cp.spawn(exePath, args, opts.spawnOpts || {});
+            let errOut = "";
+            
+            if (opts.signal) {
+                if (opts.signal.aborted) { wc.kill(); return reject(new Error("Transcription cancelled")); }
+                opts.signal.addEventListener('abort', () => { dbg("abort signal received, killing whisper-cli"); wc.kill(); }, { once: true });
             }
-            try {
-                const json = JSON.parse(fs.readFileSync(outJson, "utf8"));
-                const parsed = parseWhisperJson(json);
-                parsed.engine = "whisper.cpp";
-                dbg("parsed " + parsed.segments.length + " segment(s), lang=" + parsed.language);
-                try { fs.unlinkSync(outJson); } catch (e) {}
-                resolve(parsed);
-            } catch (e) {
-                reject(new Error("Could not parse whisper.cpp output: " + e.message));
-            }
-        });
+            
+            wc.stdout.on("data", d => { if (opts.onLog) opts.onLog(d.toString()); });
+            wc.stderr.on("data", d => { errOut += d; if (opts.onLog) opts.onLog(d.toString()); });
+            
+            wc.on("close", code => {
+                const outJson = outBase + ".json";
+                if (code !== 0 && exePath === gpuBin && !isFallback && !safeExists(outJson)) {
+                    dbg("GPU binary failed with code " + code + ". Falling back to CPU.");
+                    launch(bin, true);
+                    return;
+                }
+                dbg("whisper-cli exit " + code + (safeExists(outJson) ? " (json produced)" : " (no json)"));
+                if (code !== 0 && !safeExists(outJson)) {
+                    return reject(new Error("whisper.cpp failed (exit " + code + "): " + errOut.slice(-500)));
+                }
+                try {
+                    const json = JSON.parse(fs.readFileSync(outJson, "utf8"));
+                    const parsed = parseWhisperJson(json);
+                    parsed.engine = "whisper.cpp";
+                    dbg("parsed " + parsed.segments.length + " segment(s), lang=" + parsed.language);
+                    try { fs.unlinkSync(outJson); } catch (e) {}
+                    resolve(parsed);
+                } catch (e) {
+                    reject(new Error("Could not parse whisper.cpp output: " + e.message));
+                }
+            });
+            wc.on("error", e => {
+                if (exePath === gpuBin && !isFallback) {
+                    dbg("GPU binary spawn failed: " + e.message + ". Falling back to CPU.");
+                    launch(bin, true);
+                    return;
+                }
+                dbg("whisper-cli spawn ERROR: " + e.message);
+                reject(new Error("whisper.cpp could not run: " + e.message));
+            });
+        };
+        
+        launch(currentBin, false);
     });
 }
 
