@@ -251,9 +251,16 @@ select option { background: var(--bg3); color: var(--text); }
 .btn-transcribe:hover:not(:disabled) { filter: brightness(1.06); }
 .btn-transcribe:active:not(:disabled) { transform: scale(0.985); filter: brightness(0.97); }
 .btn-transcribe:disabled { background: var(--bg3); color: var(--text-lo); cursor: not-allowed; box-shadow: none; }
-.btn-transcribe.btn-compact { margin-top: 0; padding: 10px; font-size: 12.5px; }
-.btn-transcribe.btn-warn { background: var(--orange); color: #1a1205; }
+/* Tool-panel buttons (Edit / Audio): calmer than the hero Transcribe button —
+   subtle shadow instead of the big blue glow, so a stack doesn't look loud. */
+.btn-transcribe.btn-compact { margin-top: 0; padding: 11px; font-size: 12.5px; box-shadow: var(--shadow-sm), var(--hi-btn); }
+.btn-transcribe.btn-warn { background: linear-gradient(180deg, #ff5a4f 0%, #ff3b30 100%); color: #fff; }
 .btn-transcribe.btn-warn:hover:not(:disabled) { filter: brightness(1.06); }
+
+/* Cards that hold action buttons (not setting rows) need vertical breathing room
+   so the buttons aren't glued to the card edges. */
+.setting-item.tool-card { padding-top: 14px; padding-bottom: 14px; }
+.setting-item.tool-card .btn-transcribe + .btn-transcribe { margin-top: 9px; }
 
 .transport-row { display: flex; gap: 8px; margin-top: 8px; }
 

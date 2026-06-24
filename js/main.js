@@ -51,7 +51,7 @@ const DEFAULT_SETTINGS = {
     audioNormalize:  true,
     // ── Edit automation ──
     zoomAmount:      8,           // % push-in per clip
-    zoomStyle:       "alternate", // alternate | in
+    zoomStyle:       "in",        // in (smooth slow push-in, YouTuber-style) | alternate
     threads:         0,           // whisper.cpp threads (0 = auto: use all CPU cores)
 };
 
@@ -129,7 +129,7 @@ const I18N = {
     // actions
     act_clear: "Clear", act_send: "Send to Premiere",
     clean_title: "Clean up…", clean_dict: "Apply Dictionary", clean_filler: "Remove Fillers",
-    clean_prof: "Censor Profanity", clean_all: "Clean All",
+    clean_prof: "Censor Profanity", clean_punct: "Filter Punctuation", clean_all: "Clean All",
     export_title: "Export as…", export_srt: "SubRip", export_vtt: "WebVTT",
     export_ass: "Advanced SSA", export_txt: "Plain text",
     // settings sections
@@ -213,6 +213,7 @@ const I18N = {
     tip_clean_dict: "Apply your wrong=right rules from Settings",
     tip_clean_filler: "Remove filler words (ee, ıı, şey, um, uh…)",
     tip_clean_prof: "Censor profanity (asterisk or remove)",
+    tip_clean_punct: "Apply the Allowed-Punctuation setting (clear it to strip all punctuation)",
     tip_clean_all: "Apply dictionary + fillers + profanity at once",
     tip_export: "Export subtitles to a file",
     tip_export_srt: "Most common subtitle format. CapCut, YouTube, Premiere all open it",
@@ -282,7 +283,7 @@ const I18N = {
     btn_close: "Kapat", btn_replaceall: "Tümünü Değiştir", btn_cancel: "İptal",
     act_clear: "Temizle", act_send: "Premiere'e Gönder",
     clean_title: "Temizlik…", clean_dict: "Sözlüğü Uygula", clean_filler: "Dolguları Kaldır",
-    clean_prof: "Küfür Sansürle", clean_all: "Hepsini Temizle",
+    clean_prof: "Küfür Sansürle", clean_punct: "Noktalama Filtrele", clean_all: "Hepsini Temizle",
     export_title: "Şu formatta aktar…", export_srt: "SubRip", export_vtt: "WebVTT",
     export_ass: "Advanced SSA", export_txt: "Düz metin",
     sec_engine: "Transkripsiyon Motoru", sec_cleanup: "Metin Temizliği",
@@ -361,6 +362,7 @@ const I18N = {
     tip_clean_dict: "Ayarlardaki yanlış=doğru kurallarını uygula",
     tip_clean_filler: "Dolgu kelimeleri sil (ee, ıı, şey, um, uh…)",
     tip_clean_prof: "Küfürleri sansürle (yıldız veya kaldır)",
+    tip_clean_punct: "İzin verilen noktalama ayarını uygula (boşaltırsan tüm noktalama silinir)",
     tip_clean_all: "Sözlük + dolgu + küfür temizliğini birden uygula",
     tip_export: "Altyazıyı dosyaya aktar",
     tip_export_srt: "En yaygın altyazı formatı. CapCut, YouTube, Premiere hepsi açar",
@@ -1564,6 +1566,10 @@ function cleanMenuAction(which) {
     if (which === "dict")  applyDictionary();
     if (which === "filler") removeFillers();
     if (which === "prof")  censorProfanity();
+    if (which === "punct") {
+        const n = applyPunctuationFilter();
+        showToast(n > 0 ? `Punctuation filtered (${n} line(s))` : "No punctuation to change", n > 0 ? "success" : "info", 3000);
+    }
     if (which === "all")   cleanAll();
 }
 

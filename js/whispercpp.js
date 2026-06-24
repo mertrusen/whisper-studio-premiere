@@ -494,7 +494,7 @@ function transcribeWav(opts) {
 
         let bin = whisperBin(appDir);
         let gpuBin = null;
-        if (process.platform === "win32") {
+        if (process.platform === "win32" && !opts.forceCpu) {
             const gb = resolveBin(appDir, "whisper-cli-gpu", []);
             if (gb !== "whisper-cli-gpu.exe" && safeExists(gb)) {
                 try {
