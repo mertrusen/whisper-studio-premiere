@@ -125,7 +125,7 @@ const I18N = {
     empty_hint: "Click a word to split there · double-click text to edit.",
     // find / replace
     find_ph: "Find…", replace_ph: "Replace with… (optional)",
-    btn_close: "Close", btn_replaceall: "Replace All",
+    btn_close: "Close", btn_replaceall: "Replace All", btn_cancel: "Cancel",
     // actions
     act_clear: "Clear", act_send: "Send to Premiere",
     clean_title: "Clean up…", clean_dict: "Apply Dictionary", clean_filler: "Remove Fillers",
@@ -150,7 +150,7 @@ const I18N = {
     lbl_punct_filter: "Allowed Punctuation", hint_punct_filter: "Only these punctuation marks will be kept. Delete all to remove all punctuation.",
     lbl_prompt_words: "Context words (AI prompt)", hint_prompt_words: "Difficult words/names that the AI might mis-hear. These are sent as a prompt to improve accuracy. Comma-separated.",
     sync_title: "Sync with Correct Text", sync_ph: "Paste the fully corrected text here. This will replace words in subtitles while keeping the timing intact.",
-    sync_hint: "Word alignment algorithm will modify the current segments.", tip_sync: "Sync with correct text", btn_sync: "Sync",
+    sync_hint: "Word alignment algorithm will modify the current segments.", tip_sync: "Sync with correct text", btn_sync: "Preview changes",
     sec_api: "AI & API", nm_gemini_api: "Gemini API Key", ds_gemini_api: "Get a free key from Google AI Studio to use AI tools.",
     lbl_ai_tools: "AI Studio", tip_ai: "AI Video Tools",
     ai_summary: "Summary & Title", ai_shorts: "Extract Shorts", ai_broll: "B-Roll Ideas",
@@ -279,7 +279,7 @@ const I18N = {
     empty_p: "Timeline'da In (I) ve Out (O) noktalarını koy, sonra Transcribe'a bas.",
     empty_hint: "Bölmek için kelimeye tıkla · düzenlemek için metne çift tıkla.",
     find_ph: "Ara…", replace_ph: "Şununla değiştir… (opsiyonel)",
-    btn_close: "Kapat", btn_replaceall: "Tümünü Değiştir",
+    btn_close: "Kapat", btn_replaceall: "Tümünü Değiştir", btn_cancel: "İptal",
     act_clear: "Temizle", act_send: "Premiere'e Gönder",
     clean_title: "Temizlik…", clean_dict: "Sözlüğü Uygula", clean_filler: "Dolguları Kaldır",
     clean_prof: "Küfür Sansürle", clean_all: "Hepsini Temizle",
@@ -301,7 +301,7 @@ const I18N = {
     lbl_punct_filter: "İzin Verilen Noktalama", hint_punct_filter: "Sadece bu işaretler korunur (örn. sadece soru işareti için '?' yazın). Hepsini silerseniz tüm noktalamalar kalkar.",
     lbl_prompt_words: "Bağlam kelimeleri (AI prompt)", hint_prompt_words: "Yapay zekanın yanlış duyabileceği zor kelimeler/isimler. Doğruluğu artırmak için prompt olarak gönderilir. Virgülle ayırın.",
     sync_title: "Doğru Metin ile Eşleştir", sync_ph: "Tamamen düzeltilmiş doğru metni buraya yapıştırın. Zamanlamaları bozmadan altyazıdaki kelimeleri değiştirecektir.",
-    sync_hint: "Kelime eşleştirme algoritması mevcut segmentleri düzenler.", tip_sync: "Doğru metin ile eşleştir", btn_sync: "Eşleştir",
+    sync_hint: "Kelime eşleştirme algoritması mevcut segmentleri düzenler.", tip_sync: "Doğru metin ile eşleştir", btn_sync: "Önizle",
     sec_api: "Yapay Zeka & API", nm_gemini_api: "Gemini API Anahtarı", ds_gemini_api: "Google AI Studio'dan ücretsiz alacağınız anahtarla çalışır.",
     lbl_ai_tools: "AI Studio", tip_ai: "Yapay Zeka Araçları",
     ai_summary: "Özet & Başlık", ai_shorts: "Shorts Çıkar", ai_broll: "B-Roll Fikirleri",
@@ -1669,14 +1669,16 @@ async function askAi(type) {
         return;
     }
     
-    // Build transcript
+    // Build a NUMBERED transcript (1 line per segment) — so grammar/translate can
+    // be mapped back 1:1 to segments by line number (no fragile word-diffing).
     let transcript = "";
-    segments.forEach(seg => {
-        if (!seg.text) return;
-        transcript += `${fmtMMSS(seg.start)} ${seg.text}\n`;
+    segments.forEach((seg, i) => {
+        transcript += `${i + 1} [${fmtMMSS(seg.start)}] ${(seg.text || "").replace(/\s+/g, " ").trim()}\n`;
     });
-    
+    const lineCount = segments.length;
+
     const STRICT_RULE = "IMPORTANT: Return ONLY the raw requested data. Do not include conversational filler, introductions, or conclusions like 'Here is your analysis' or 'Great topic'.";
+    const NUMBERED_RULE = `The transcript has ${lineCount} numbered lines (format: "N [MM:SS] text"). Return EXACTLY ${lineCount} lines, one per number, in the format "N. text" (the number, a period, then the text). Keep the SAME count and order — NEVER merge, split, reorder, add, or drop a line. Output ONLY these numbered lines, nothing else.`;
     
     let prompt = "";
     if (type === "summary") {
@@ -1688,9 +1690,11 @@ async function askAi(type) {
     } else if (type === "tags") {
         prompt = `Generate a comma-separated list of 15-20 highly searched YouTube tags and 3-5 relevant hashtags (#) for this video based on the transcript.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
     } else if (type === "translate_en") {
-        prompt = `Translate the following video transcript into English. You MUST preserve the exact timecodes exactly as they appear. Return ONLY the translated transcript.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+        prompt = `Translate each subtitle line below into natural, fluent English. Localize idioms (don't translate word-for-word); keep each line a concise subtitle.\n\n${NUMBERED_RULE}\n\nTranscript:\n${transcript}`;
     } else if (type === "grammar") {
-        prompt = `Analyze the following video transcript. Fix all spelling, punctuation, and grammatical errors without changing the timecodes. Return ONLY the fully corrected transcript with the exact same timecodes.\n\n${STRICT_RULE}\n\nTranscript:\n${transcript}`;
+        const contextHint = (settings.promptWords && settings.promptWords.trim())
+            ? ` Known correct terms / proper nouns to respect: ${settings.promptWords.trim()}.` : "";
+        prompt = `You are a meticulous subtitle proofreader. For EACH line below, fix spelling, punctuation, capitalization and grammar; fix obvious speech-to-text mishearings using surrounding context; restore proper nouns, brand names and technical terms; make it read naturally and correctly. Do NOT translate, do NOT summarize or rephrase for style, do NOT add or remove content, and do NOT change the meaning. Keep each line about the same length (it is an on-screen subtitle). Reply in the SAME language as the line.${contextHint}\n\n${NUMBERED_RULE}\n\nTranscript:\n${transcript}`;
     }
     
     const outBox = $("ai-output");
@@ -1770,24 +1774,46 @@ async function askAi(type) {
     }
 }
 
-function applyAiToSubtitles() {
-    let text = $("ai-output").value;
-    if (!text || text.includes("Error:") || text.includes("Thinking...")) return;
-    
-    // Clean up AI output: remove timecode anchors like [00:39] or **[00:00:10]** 
-    text = text.replace(/\[?\d{1,2}:\d{2}(:\d{2})?(\.\d{1,3})?\]?/g, function(match) {
-        // Only strip if it's bracketed OR looks exactly like a timecode at the start/end
-        if (match.includes("[") || match.includes("]")) return " ";
-        return match; 
+// Parse the AI's numbered output ("N. text") back onto segments 1:1. Robust —
+// no word-diffing, so it can't dump everything into one segment.
+function parseNumberedAi(text) {
+    const map = {};        // segmentIndex(0-based) → corrected text
+    (text || "").split(/\r?\n/).forEach(line => {
+        const m = line.match(/^\s*(\d+)\s*[.)\]:|\-]\s*(.*)$/);
+        if (!m) return;
+        const n = parseInt(m[1], 10);
+        if (!n || n < 1) return;
+        let t = m[2].replace(/^\[\d{1,2}:\d{2}(:\d{2})?\]\s*/, "");   // strip a leftover [MM:SS]
+        t = t.replace(/(\*\*|__|\*|_|`)/g, "").replace(/\s+/g, " ").trim();
+        map[n - 1] = t;
     });
-    // Also remove bracketed timecodes explicitly just in case
-    text = text.replace(/\[\d{1,2}:\d{2}\]/g, " ");
-    
-    // Remove markdown formatting that interferes with word diffing
-    text = text.replace(/(\*\*|\_\_|\*|\_)/g, "");
+    return map;
+}
 
-    $("sync-input").value = text;
-    doSyncText();
+function applyAiToSubtitles() {
+    const text = $("ai-output").value;
+    if (!text || text.includes("Error:") || text.startsWith("Thinking")) return;
+
+    const map = parseNumberedAi(text);
+    const keys = Object.keys(map);
+    if (keys.length === 0) {
+        // No numbered lines found → fall back to the old word-sync path.
+        let plain = text.replace(/\[?\d{1,2}:\d{2}(:\d{2})?\]?/g, m => (m.includes("[") ? " " : m))
+                        .replace(/(\*\*|__|\*|_)/g, "");
+        $("sync-input").value = plain;
+        doSyncText();
+        return;
+    }
+
+    let changed = 0;
+    keys.forEach(k => {
+        const i = +k;
+        if (segments[i] && map[k] && segments[i].text !== map[k]) { segments[i].text = map[k]; changed++; }
+    });
+    renderSegments();
+    if (selectedIndex >= 0) selectSegment(selectedIndex);
+    setStatus(`AI applied — ${changed} line(s) updated`, "success");
+    showToast(`Applied to ${changed} subtitle line(s)`, "success");
 }
 
 function doSyncText() {
@@ -1845,21 +1871,60 @@ function doSyncText() {
         }
     }
 
-    let changedCount = 0;
+    // Build a proposal of ONLY the changed lines and show a preview first —
+    // nothing is applied until the user confirms.
+    const proposal = [];
     segments.forEach((s, i) => {
-        const nt = newSegText[i].trim();
-        if (s.text !== nt) {
-            s.text = nt;
-            changedCount++;
-        }
+        const nt = (newSegText[i] || "").replace(/\s+/g, " ").trim();
+        if (nt && s.text !== nt) proposal.push({ i, oldText: s.text, newText: nt });
     });
+    _syncProposal = proposal;
+    showSyncPreview(proposal);
+}
 
+let _syncProposal = null;
+
+function showSyncPreview(proposal) {
+    const box = $("sync-preview");
+    const list = $("sync-preview-list");
+    if (!box || !list) {   // no preview UI → apply directly (fallback)
+        applySyncProposal();
+        return;
+    }
+    if (!proposal.length) {
+        list.innerHTML = `<div class="sync-diff-empty">No changes — the text already matches.</div>`;
+    } else {
+        list.innerHTML = proposal.map(p => `
+            <div class="sync-diff-row">
+              <span class="sync-diff-i">#${p.i + 1}</span>
+              <div class="sync-diff-texts">
+                <div class="sync-diff-old">${escHtml(p.oldText)}</div>
+                <div class="sync-diff-new">${escHtml(p.newText)}</div>
+              </div>
+            </div>`).join("");
+    }
+    const applyBtn = $("sync-apply-btn");
+    if (applyBtn) applyBtn.textContent = proposal.length ? `Apply ${proposal.length} change(s)` : "Apply";
+    box.style.display = "flex";
+    if ($("sync-status")) $("sync-status").textContent = `${proposal.length} change(s) — review below, then Apply.`;
+}
+
+function applySyncProposal() {
+    if (!_syncProposal) return;
+    let n = 0;
+    _syncProposal.forEach(p => { if (segments[p.i]) { segments[p.i].text = p.newText; n++; } });
+    _syncProposal = null;
+    if ($("sync-preview")) $("sync-preview").style.display = "none";
     renderSegments();
     if (selectedIndex >= 0) selectSegment(selectedIndex);
-    
-    if ($("sync-status")) $("sync-status").textContent = `Matched! ${changedCount} segment(s) updated.`;
-    setStatus(`Text synced. ${changedCount} segment(s) modified.`, "success");
-    showToast(`Text synchronized! (${changedCount} modified)`, "success");
+    setStatus(`Text synced — ${n} segment(s) updated.`, "success");
+    showToast(`Applied (${n} updated)`, "success");
+}
+
+function cancelSyncPreview() {
+    _syncProposal = null;
+    if ($("sync-preview")) $("sync-preview").style.display = "none";
+    if ($("sync-status")) $("sync-status").textContent = "Cancelled — nothing changed.";
 }
 
 function clearFindHighlight() {
@@ -2446,13 +2511,15 @@ function editSegment(idx) {
     ta.id = `seg-text-${idx}`;
     ta.focus();
     const save = () => {
-        segments[idx].text = ta.value.trim();
+        // Keep subtitles single-line — collapse any stray line breaks/whitespace.
+        segments[idx].text = ta.value.replace(/\s+/g, " ").trim();
         ta.closest(".segment")?.classList.remove("editing");
         renderSegments(); selectSegment(idx);
     };
     ta.addEventListener("blur", save);
     ta.addEventListener("keydown", e => {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+        // Subtitles stay single-line — Enter always saves (never inserts a break).
+        if (e.key === "Enter") { e.preventDefault(); save(); }
         if (e.key === "Escape") save();
     });
     ta.closest(".segment")?.classList.add("editing");
@@ -3051,7 +3118,20 @@ function initTooltips() {
         }
     });
 
-    if (!IS_DESKTOP()) {
+    // Premiere extension only. IS_DESKTOP is defined by desktop-shim.js (desktop
+    // only) — referencing it bare here threw a ReferenceError in the extension and
+    // killed this whole init block, so the playhead-sync loop never started.
+    const _isDesktop = (typeof window !== "undefined" && window.IS_DESKTOP === true);
+    if (!_isDesktop) {
+        // Space = play/pause in Premiere (unless you're typing in a field).
+        document.addEventListener("keydown", (e) => {
+            if (e.code !== "Space" && e.key !== " ") return;
+            const el = document.activeElement, tag = el && el.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || (el && el.isContentEditable)) return;
+            e.preventDefault();
+            playPause();
+        });
+
         setInterval(async () => {
             if (!segments || segments.length === 0 || isRunning) return;
             // Robust playhead read: getPlayerPosition().seconds is undefined on

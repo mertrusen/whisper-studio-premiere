@@ -344,6 +344,14 @@ mark.find-hit { background: var(--yellow); color: #1a1206; border-radius: 3px; p
 .segment.selected::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
 .segment.playing { background: var(--green-bg); }
 .segment.playing::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green); }
+
+/* Sync / replace preview (before → after) */
+.sync-diff-row { display: flex; gap: 8px; padding: 7px 9px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sync-diff-i { font-size: 10px; color: var(--text3); font-weight: 600; min-width: 22px; flex-shrink: 0; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.sync-diff-texts { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sync-diff-old { font-size: 12px; color: var(--red2); text-decoration: line-through; opacity: .7; word-break: break-word; }
+.sync-diff-new { font-size: 12.5px; color: var(--green); word-break: break-word; }
+.sync-diff-empty { font-size: 12px; color: var(--text2); padding: 10px; text-align: center; }
 .segment.editing  { background: var(--bg2); }
 
 .seg-header { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }

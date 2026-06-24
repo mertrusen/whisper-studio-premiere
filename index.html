@@ -14,7 +14,7 @@
       <div class="brand-text">
         <span class="brand-title">Sub<span>sper</span></span>
         <span class="brand-tagline" data-i18n="tagline">AI Subtitles</span>
-        <span class="brand-version" style="font-size: 10px; color: var(--text3); margin-left: 6px; font-weight: 500;">v1.6.9</span>
+        <span class="brand-version" style="font-size: 10px; color: var(--text3); margin-left: 6px; font-weight: 500;">v1.7.0</span>
       </div>
     </div>
     <div class="header-right">
@@ -165,7 +165,15 @@
       <textarea id="sync-input" class="settings-textarea" rows="6" style="flex:1; min-height:100px; resize:none" data-i18n-ph="sync_ph" placeholder="Paste the fully corrected text here. This will replace words in subtitles while keeping the timing intact."></textarea>
       <div style="display:flex; justify-content:space-between; align-items:center">
         <span class="setting-hint" data-i18n="sync_hint" id="sync-status">Word alignment algorithm will modify the current segments.</span>
-        <button class="btn-send" onclick="doSyncText()" data-i18n="btn_sync">Sync</button>
+        <button class="btn-send" onclick="doSyncText()" data-i18n="btn_sync">Preview changes</button>
+      </div>
+      <!-- Preview / confirm before applying -->
+      <div id="sync-preview" style="display:none; flex-direction:column; gap:8px; overflow:hidden; border-top:1px solid var(--border); padding-top:8px; flex:1; min-height:0;">
+        <div id="sync-preview-list" style="overflow-y:auto; display:flex; flex-direction:column; gap:6px; flex:1; min-height:0;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn-secondary" onclick="cancelSyncPreview()" data-i18n="btn_cancel">Cancel</button>
+          <button class="btn-send" id="sync-apply-btn" onclick="applySyncProposal()">Apply</button>
+        </div>
       </div>
     </div>
 
